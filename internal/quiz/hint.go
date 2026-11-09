@@ -187,10 +187,6 @@ func humanize(k string) string {
 	switch k {
 	case "arguments", "argument_list":
 		return "argument list"
-	case "call":
-		return "function call"
-	case "attribute":
-		return "attribute access"
 	case "code":
 		return "piece of code"
 	}

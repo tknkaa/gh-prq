@@ -155,7 +155,7 @@ func (s *Session) ReadFile(kind, file string) ([]byte, error) {
 
 // FindResumable は同じ PR の同じコミットに対する、やりかけのセッションを探す。
 // head が進んでいたら差分が変わっているので、古いセッションは再開しない。
-func FindResumable(repo string, t Target) *Session {
+func FindResumable(repo string, t Target, level quiz.Level) *Session {
 	entries, err := os.ReadDir(filepath.Join(baseDir(), "sessions"))
 	if err != nil {
 		return nil
@@ -170,7 +170,8 @@ func FindResumable(repo string, t Target) *Session {
 		if json.Unmarshal(data, &s) != nil {
 			continue
 		}
-		if s.Done || s.Repo != repo || s.Target.HeadSHA != t.HeadSHA || s.Target.PR != t.PR || s.Target.HeadRef != t.HeadRef {
+		// 難易度を変えて起動したのは別の問題を解きたいということなので、やりかけでも再開しない
+		if s.Done || s.Repo != repo || s.Level != level || s.Target.HeadSHA != t.HeadSHA || s.Target.PR != t.PR || s.Target.HeadRef != t.HeadRef {
 			continue
 		}
 		if found == nil || s.CreatedAt.After(found.CreatedAt) {

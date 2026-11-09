@@ -174,7 +174,7 @@ func (m *Model) listBox(w, h int) string {
 				lines = append(lines, "")
 			}
 			// 深いパスでもファイル名が見えるよう、左側を削る
-			lines = append(lines, bold.Render(ansi.TruncateLeft(b.File, max(0, len(b.File)-inner), "…")))
+			lines = append(lines, bold.Render(ansi.TruncateLeft(b.File, max(0, len(b.File)-inner+1), "…")))
 			lastFile = b.File
 		}
 		mark, label := outcomeMark(b)

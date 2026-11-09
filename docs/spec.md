@@ -19,7 +19,7 @@ A TUI tool that turns a pull request diff into a fill-in-the-blank quiz that you
 - tree-sitter is written in C, so cgo is required.
   - In development you only need gcc.
   - Release binaries are built natively per OS in CI (see Release).
-- Supported languages: TypeScript / TSX / JavaScript / Go / Python / Rust.
+- Supported languages: TypeScript / TSX / JavaScript / Go / Python / Rust / Terraform (HCL).
   - Grammars are compiled into the binary, so each new language makes it larger.
 
 | Dependency | Version |
@@ -146,7 +146,7 @@ Each blank ends up in one of these states.
   3. The worktree is removed.
   4. A summary is printed.
 - On the next run:
-  - If an unfinished session exists for the same repository, PR and head commit, the worktree is recreated, overwritten with the files in `work/`, and the quiz continues.
+  - If an unfinished session exists for the same repository, PR, head commit and level, the worktree is recreated, overwritten with the files in `work/`, and the quiz continues.
   - If the head has changed, the diff has changed too, so a new quiz is created.
   - Only files with blanks are saved, so edits to other files are lost.
 - Quitting during preparation waits for preparation to finish and then cleans up, so no worktree is left behind. A failed preparation also removes its worktree.

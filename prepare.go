@@ -49,7 +49,7 @@ func prepare(cwd string, o options, progress func(step int, detail string)) (*se
 	}
 
 	// AI の出題で始めるときは、やりかけのセッションより新しい出題を優先する
-	if s := session.FindResumable(root, t); s != nil && o.Plan == "" {
+	if s := session.FindResumable(root, t, o.Level); s != nil && o.Plan == "" {
 		progress(stepWorktree, "resuming "+s.ID)
 		if err := restore(s); err != nil {
 			return nil, err

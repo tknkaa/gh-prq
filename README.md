@@ -113,7 +113,23 @@ gh prq 123 --plan plan.json
 
 The agent's hint is shown first, and its explanation appears once a blank is solved or revealed. Results are written next to the plan as `plan.status.json` so the agent can review them with you.
 
-A [Claude Code](https://claude.com/claude-code) skill that does all of this is included in [`skills/prq`](skills/prq/SKILL.md). Copy or link it into `~/.claude/skills/prq` and ask Claude to quiz you on a PR.
+### Claude Code skill
+
+A [Claude Code](https://claude.com/claude-code) skill that does all of this is included in [`skills/prq`](skills/prq/SKILL.md). Install it into your personal skills directory:
+
+```sh
+mkdir -p ~/.claude/skills/prq
+curl -fsSL https://raw.githubusercontent.com/tknkaa/gh-prq/main/skills/prq/SKILL.md \
+  -o ~/.claude/skills/prq/SKILL.md
+```
+
+If you have a clone of this repository, link it instead so it stays up to date with `git pull`:
+
+```sh
+ln -s "$PWD/skills/prq" ~/.claude/skills/prq
+```
+
+Then ask Claude to quiz you on a PR, for example "quiz me on #123". The skill opens the quiz in a new tab when Claude Code runs inside [herdr](https://herdr.dev); elsewhere it tells you the command to run.
 
 ## Building from source
 

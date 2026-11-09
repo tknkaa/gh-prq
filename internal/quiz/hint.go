@@ -191,6 +191,8 @@ func humanize(k string) string {
 		return "function call"
 	case "attribute":
 		return "attribute access"
+	case "code":
+		return "piece of code"
 	}
 	return strings.ReplaceAll(k, "_", " ")
 }

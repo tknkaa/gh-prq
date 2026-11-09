@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/tknkaa/gh-prq/internal/gitx"
@@ -17,6 +18,7 @@ type options struct {
 	PR    int
 	Level quiz.Level
 	Count int
+	Plan  string
 }
 
 const (
@@ -46,7 +48,8 @@ func prepare(cwd string, o options, progress func(step int, detail string)) (*se
 		return nil, err
 	}
 
-	if s := session.FindResumable(root, t); s != nil {
+	// AI の出題で始めるときは、やりかけのセッションより新しい出題を優先する
+	if s := session.FindResumable(root, t); s != nil && o.Plan == "" {
 		progress(stepWorktree, "resuming "+s.ID)
 		if err := restore(s); err != nil {
 			return nil, err
@@ -63,8 +66,19 @@ func prepare(cwd string, o options, progress func(step int, detail string)) (*se
 		return nil, fmt.Errorf("no changes between %s and %s", t.BaseRef, t.HeadRef)
 	}
 
+	var plan *quiz.Plan
+	if o.Plan != "" {
+		if plan, err = quiz.LoadPlan(o.Plan); err != nil {
+			return nil, err
+		}
+	}
+
 	s := &session.Session{
 		ID: session.NewID(), Repo: root, Target: t, Level: o.Level, CreatedAt: time.Now(),
+	}
+	if plan != nil {
+		s.Level = "ai"
+		s.StatusPath = strings.TrimSuffix(o.Plan, ".json") + ".status.json"
 	}
 	s.Worktree = filepath.Join(root, ".worktree", "prq-"+s.ID)
 	progress(stepWorktree, s.Worktree)
@@ -82,7 +96,40 @@ func prepare(cwd string, o options, progress func(step int, detail string)) (*se
 	var cands []quiz.Candidate
 	parsed := 0
 	origs := map[string][]byte{}
+	var picked []quiz.Candidate
+	if plan != nil {
+		progress(stepParse, fmt.Sprintf("%d planned blanks", len(plan.Blanks)))
+		for _, e := range plan.Blanks {
+			l := lang.ForFile(e.File)
+			if l == nil {
+				s.Notes = append(s.Notes, fmt.Sprintf("skipped %s: unsupported language", e.File))
+				continue
+			}
+			src, ok := origs[e.File]
+			if !ok {
+				if src, err = os.ReadFile(filepath.Join(s.Worktree, e.File)); err != nil {
+					s.Notes = append(s.Notes, fmt.Sprintf("skipped %s: %v", e.File, err))
+					continue
+				}
+				origs[e.File] = src
+			}
+			c, err := quiz.PlanCandidate(l, src, e)
+			if err != nil {
+				s.Notes = append(s.Notes, "skipped "+err.Error())
+				continue
+			}
+			cands = append(cands, c)
+		}
+		kept, dropped := quiz.FilterOverlaps(cands)
+		for _, c := range dropped {
+			s.Notes = append(s.Notes, fmt.Sprintf("skipped %s:%d: too close to another blank", c.File, c.StartRow+1))
+		}
+		picked = quiz.SortCandidates(kept)
+	}
 	for file, rows := range added {
+		if plan != nil {
+			break
+		}
 		l := lang.ForFile(file)
 		if l == nil {
 			continue
@@ -98,8 +145,13 @@ func prepare(cwd string, o options, progress func(step int, detail string)) (*se
 	}
 
 	progress(stepChoose, "")
-	rng := rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0))
-	picked := quiz.Select(cands, o.Count, rng)
+	if plan == nil {
+		rng := rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0))
+		picked = quiz.Select(cands, o.Count, rng)
+	}
+	if len(picked) == 0 && plan != nil {
+		return nil, fmt.Errorf("no usable blanks in the plan: %s", strings.Join(s.Notes, "; "))
+	}
 	if len(picked) == 0 {
 		return nil, fmt.Errorf("no %s blanks found in %d supported changed files", o.Level, parsed)
 	}

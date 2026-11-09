@@ -26,9 +26,10 @@ func parseArgs(args []string) (options, error) {
 	fs := flag.NewFlagSet("prq", flag.ContinueOnError)
 	level := fs.String("level", "easy", "difficulty: easy, normal, hard")
 	count := fs.Int("count", 5, "number of blanks")
+	plan := fs.String("plan", "", "use blanks chosen in a JSON plan file (written by an AI agent)")
 	showVersion := fs.Bool("version", false, "print version")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: gh prq [<number>] [--level easy|normal|hard] [--count N]")
+		fmt.Fprintln(fs.Output(), "Usage: gh prq [<number>] [--level easy|normal|hard] [--count N] [--plan FILE]")
 		fs.PrintDefaults()
 	}
 	var o options
@@ -54,7 +55,7 @@ func parseArgs(args []string) (options, error) {
 	if err != nil {
 		return o, err
 	}
-	o.Level, o.Count = lv, *count
+	o.Level, o.Count, o.Plan = lv, *count, *plan
 	return o, nil
 }
 

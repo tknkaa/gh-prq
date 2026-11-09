@@ -67,7 +67,7 @@ func PlanCandidate(l *lang.Lang, src []byte, e PlanEntry) (Candidate, error) {
 		start, end := ls+idx, ls+idx+len(e.Text)
 		return Candidate{
 			File: e.File, Start: start, End: end, StartRow: row, EndRow: row,
-			Kind: exactKind(root.NamedDescendantForByteRange(uint(start), uint(end)), start, end),
+			Kind: l.KindName(exactKind(root.NamedDescendantForByteRange(uint(start), uint(end)), start, end)),
 			Hint: e.Hint, Explanation: e.Explanation,
 		}, nil
 	}
@@ -85,7 +85,7 @@ func PlanCandidate(l *lang.Lang, src []byte, e PlanEntry) (Candidate, error) {
 	ce := start + len(strings.TrimRight(string(src[start:end]), " \t"))
 	return Candidate{
 		File: e.File, Start: start, End: end, StartRow: row, EndRow: er, LineLevel: true,
-		Kind: exactKind(root.NamedDescendantForByteRange(uint(cs), uint(ce)), cs, ce),
+		Kind: l.KindName(exactKind(root.NamedDescendantForByteRange(uint(cs), uint(ce)), cs, ce)),
 		Hint: e.Hint, Explanation: e.Explanation,
 	}, nil
 }

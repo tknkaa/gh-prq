@@ -6,6 +6,7 @@ import (
 	"sync"
 	"unsafe"
 
+	hcl "github.com/tree-sitter-grammars/tree-sitter-hcl/bindings/go"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 	tsgo "github.com/tree-sitter/tree-sitter-go/bindings/go"
 	tsjs "github.com/tree-sitter/tree-sitter-javascript/bindings/go"
@@ -17,6 +18,8 @@ import (
 type Lang struct {
 	Name    string
 	Comment string
+	// KindNames はヒントに出すノード種別の言い換え。同じ種別名でも言語によって意味が違うため、言語ごとに持つ
+	KindNames map[string]string
 
 	ptr  func() unsafe.Pointer
 	once sync.Once
@@ -42,9 +45,31 @@ var (
 	tsx        = &Lang{Name: "TSX", Comment: "//", ptr: tsts.LanguageTSX}
 	javascript = &Lang{Name: "JavaScript", Comment: "//", ptr: tsjs.Language}
 	golang     = &Lang{Name: "Go", Comment: "//", ptr: tsgo.Language}
-	python     = &Lang{Name: "Python", Comment: "#", ptr: tspy.Language}
-	rust       = &Lang{Name: "Rust", Comment: "//", ptr: tsrust.Language}
+	python     = &Lang{Name: "Python", Comment: "#", ptr: tspy.Language,
+		KindNames: map[string]string{"attribute": "attribute access", "call": "function call"}}
+	rust = &Lang{Name: "Rust", Comment: "//", ptr: tsrust.Language}
+	// Terraform 専用の方言は Go のバインディングが無いので、素の HCL で解析する。Terraform の構文は HCL そのものなので困らない
+	terraform = &Lang{Name: "HCL", Comment: "#", ptr: hcl.Language,
+		KindNames: map[string]string{
+			"attribute": "argument", "variable_expr": "reference", "function_call": "function call",
+			"literal_value": "literal value", "template_expr": "string template",
+			"collection_value": "list or map", "for_expr": "for expression",
+		}}
 )
+
+// IsHCL は HCL 固有の候補の選び方を使うかどうかを返す。
+func (l *Lang) IsHCL() bool { return l == terraform }
+
+// IsIndentBlock はインデントでブロックを作る言語かどうかを返す。
+func (l *Lang) IsIndentBlock() bool { return l == python }
+
+// KindName はヒント用に種別名を言い換える。
+func (l *Lang) KindName(kind string) string {
+	if n, ok := l.KindNames[kind]; ok {
+		return n
+	}
+	return kind
+}
 
 var byExt = map[string]*Lang{
 	".ts": typescript, ".mts": typescript, ".cts": typescript,
@@ -53,6 +78,7 @@ var byExt = map[string]*Lang{
 	".go": golang,
 	".py": python,
 	".rs": rust,
+	".tf": terraform, ".tfvars": terraform, ".hcl": terraform,
 }
 
 // ForFile は対応していない拡張子なら nil を返す。

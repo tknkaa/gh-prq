@@ -61,14 +61,19 @@ func FindCandidates(file string, l *lang.Lang, src []byte, added map[int]bool, l
 	defer tree.Close()
 	t := newText(src)
 	root := tree.RootNode()
+	var out []Candidate
 	switch level {
 	case Normal:
-		return lineCandidates(file, root, t, added)
+		out = lineCandidates(file, root, t, added)
 	case Hard:
-		return blockCandidates(file, root, src, t, added)
+		out = blockCandidates(file, l, root, src, t, added)
 	default:
-		return easyCandidates(file, root, src, t, added)
+		out = easyCandidates(file, l, root, src, t, added)
 	}
+	for i := range out {
+		out[i].Kind = l.KindName(out[i].Kind)
+	}
+	return out
 }
 
 func walk(n *sitter.Node, fn func(*sitter.Node)) {
@@ -80,11 +85,20 @@ func walk(n *sitter.Node, fn func(*sitter.Node)) {
 	}
 }
 
-func easyCandidates(file string, root *sitter.Node, src []byte, t text, added map[int]bool) []Candidate {
+func easyCandidates(file string, l *lang.Lang, root *sitter.Node, src []byte, t text, added map[int]bool) []Candidate {
 	var out []Candidate
 	walk(root, func(n *sitter.Node) {
 		sr, er := int(n.StartPosition().Row), int(n.EndPosition().Row)
-		if sr != er || !added[sr] || !easyKinds[n.Kind()] || n.HasError() {
+		if sr != er || !added[sr] || n.HasError() {
+			return
+		}
+		kind := n.Kind()
+		if l.IsHCL() {
+			var ok bool
+			if kind, ok = hclEasyKind(n, src); !ok {
+				return
+			}
+		} else if !easyKinds[kind] {
 			return
 		}
 		s, e := int(n.StartByte()), int(n.EndByte())
@@ -96,9 +110,41 @@ func easyCandidates(file string, root *sitter.Node, src []byte, t text, added ma
 		if strings.TrimSpace(t.line(sr)) == strings.TrimSpace(txt) {
 			return
 		}
-		out = append(out, Candidate{File: file, Start: s, End: e, StartRow: sr, EndRow: sr, Kind: n.Kind()})
+		out = append(out, Candidate{File: file, Start: s, End: e, StartRow: sr, EndRow: sr, Kind: kind})
 	})
 	return out
+}
+
+// Terraform で問うべきなのは「この引数に何を渡すか」なので、引数の右辺を丸ごと穴にする。
+// 式の内部まで細かく穴にすると、参照の一部だけが空いた解きにくい問題になる。
+var hclEasyKinds = map[string]bool{
+	"function_call": true, "conditional": true, "operation": true, "for_expr": true,
+}
+
+func hclEasyKind(n *sitter.Node, src []byte) (string, bool) {
+	if hclEasyKinds[n.Kind()] {
+		return n.Kind(), true
+	}
+	if n.Kind() != "expression" {
+		return "", false
+	}
+	p := n.Parent()
+	if p == nil || (p.Kind() != "attribute" && p.Kind() != "object_elem") {
+		return "", false
+	}
+	// true / false / null は二択の当て推量になるので出さない
+	switch strings.TrimSpace(n.Utf8Text(src)) {
+	case "true", "false", "null":
+		return "", false
+	}
+	if c := n.NamedChild(0); c != nil {
+		// 中身が関数呼び出しなどなら、その種類をヒントに使う
+		if c.Kind() == "variable_expr" && n.NamedChildCount() > 1 {
+			return "variable_expr", true
+		}
+		return c.Kind(), true
+	}
+	return n.Kind(), true
 }
 
 func lineCandidates(file string, root *sitter.Node, t text, added map[int]bool) []Candidate {
@@ -129,28 +175,49 @@ func lineCandidates(file string, root *sitter.Node, t text, added map[int]bool) 
 	return out
 }
 
-func blockCandidates(file string, root *sitter.Node, src []byte, t text, added map[int]bool) []Candidate {
+func blockCandidates(file string, l *lang.Lang, root *sitter.Node, src []byte, t text, added map[int]bool) []Candidate {
 	var out []Candidate
 	walk(root, func(n *sitter.Node) {
 		k := n.Kind()
-		if k != "statement_block" && k != "block" {
-			return
-		}
 		sr, er := int(n.StartPosition().Row), int(n.EndPosition().Row)
 		var is, ie int
-		if src[n.StartByte()] == '{' {
+		kind := k
+		if p := n.Parent(); p != nil {
+			kind = p.Kind()
+		}
+		switch {
+		case l.IsHCL():
+			// HCL の block は `resource "x" "y" {` から始まるので、波括弧の中の body だけを穴にする
+			p := n.Parent()
+			if k != "body" || p == nil || p.Kind() != "block" {
+				return
+			}
+			if strings.TrimSpace(t.line(sr)[:n.StartPosition().Column]) != "" {
+				return
+			}
+			is, ie = sr, er
+			// resource や dynamic などブロックの種類が分かると、何を書くべきかの手がかりになる
+			kind = "block"
+			if id := p.NamedChild(0); id != nil && id.Kind() == "identifier" {
+				kind = id.Utf8Text(src) + " block"
+			}
+		case k != "statement_block" && k != "block":
+			return
+		case src[n.StartByte()] == '{':
 			// 波括弧の行は残して中身だけを穴にする。括弧まで消すと、どこまで書けばいいか分からなくなる
 			if !strings.HasSuffix(strings.TrimRight(t.line(sr), " \t"), "{") ||
 				!strings.HasPrefix(strings.TrimLeft(t.line(er), " \t"), "}") {
 				return
 			}
 			is, ie = sr+1, er-1
-		} else {
+		case l.IsIndentBlock():
 			// Python のようにインデントでブロックを作る言語は、ブロックの行全体を穴にする
 			if strings.TrimSpace(t.line(sr)[:n.StartPosition().Column]) != "" {
 				return
 			}
 			is, ie = sr, er
+		default:
+			return
 		}
 		if ie-is+1 < 2 || ie-is+1 > 12 {
 			return
@@ -159,10 +226,6 @@ func blockCandidates(file string, root *sitter.Node, src []byte, t text, added m
 			if !added[r] {
 				return
 			}
-		}
-		kind := k
-		if p := n.Parent(); p != nil {
-			kind = p.Kind()
 		}
 		out = append(out, Candidate{
 			File: file, Start: t.lineStart(is), End: t.lineEnd(ie),

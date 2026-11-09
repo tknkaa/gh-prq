@@ -19,7 +19,7 @@ A TUI tool that turns a pull request diff into a fill-in-the-blank quiz that you
 - tree-sitter is written in C, so cgo is required.
   - In development you only need gcc.
   - Release binaries are built natively per OS in CI (see Release).
-- Supported languages: TypeScript / TSX / JavaScript / Go / Python / Rust.
+- Supported languages: TypeScript / TSX / JavaScript / Go / Python / Rust / Terraform (HCL).
   - Grammars are compiled into the binary, so each new language makes it larger.
 
 | Dependency | Version |
@@ -68,6 +68,11 @@ Candidates are found with tree-sitter among the added lines.
 | hard | block | the body of `{ }` (the brace lines stay) or a Python indented block. 2–12 lines, all of them added |
 
 - Bare identifiers and literals are never blanks; they would be guesswork.
+- Terraform (HCL) uses its own rules, because what matters there is which value each argument gets:
+  - easy: the whole right-hand side of an argument (`name = <blank>`), such as a reference (`azurerm_resource_group.main.name`), a function call, a conditional or a string template. Parts of a reference are never blanked on their own. `true`, `false` and `null` are excluded because they are a coin toss.
+  - normal: a whole `name = value` line.
+  - hard: the body of a block (`resource`, `dynamic`, `content`, …), keeping the header and braces. The hint names the block type, such as "the body of a content block".
+  - The Terraform dialect of the grammar has no Go binding, so the plain HCL grammar is used. Terraform syntax is plain HCL, so nothing is lost.
 - Candidates are shuffled and picked so that at least 2 untouched lines separate blanks in the same file. Answers are located using the 2 lines before and after each blank as anchors, so anchors must not overlap other blanks.
 
 ### Representation in the file
@@ -146,7 +151,7 @@ Each blank ends up in one of these states.
   3. The worktree is removed.
   4. A summary is printed.
 - On the next run:
-  - If an unfinished session exists for the same repository, PR and head commit, the worktree is recreated, overwritten with the files in `work/`, and the quiz continues.
+  - If an unfinished session exists for the same repository, PR, head commit and level, the worktree is recreated, overwritten with the files in `work/`, and the quiz continues.
   - If the head has changed, the diff has changed too, so a new quiz is created.
   - Only files with blanks are saved, so edits to other files are lost.
 - Quitting during preparation waits for preparation to finish and then cleans up, so no worktree is left behind. A failed preparation also removes its worktree.

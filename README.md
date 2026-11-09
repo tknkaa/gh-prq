@@ -68,7 +68,7 @@ Search for `__prq_` or `prq#` to find the blanks, fill them in and save. The TUI
 | `y` | copy `path:line` of the blank |
 | `q` | quit |
 
-Quitting saves your answers and removes the worktree. Run `gh prq` again on the same PR to continue where you left off.
+Quitting saves your answers and removes the worktree. Run `gh prq` again on the same PR to continue where you left off, or `gh prq --new` to throw it away and get a fresh set of blanks.
 
 ### Levels
 

@@ -19,6 +19,7 @@ type options struct {
 	Level quiz.Level
 	Count int
 	Plan  string
+	New   bool
 }
 
 const (
@@ -48,8 +49,9 @@ func prepare(cwd string, o options, progress func(step int, detail string)) (*se
 		return nil, err
 	}
 
-	// AI の出題で始めるときは、やりかけのセッションより新しい出題を優先する
-	if s := session.FindResumable(root, t, o.Level); s != nil && o.Plan == "" {
+	// AI の出題で始めるときや --new のときは、やりかけのセッションより新しい出題を優先する。
+	// 古いセッションは残るが、再開するのは一番新しいセッションなので、次回からはこちらが続きになる
+	if s := session.FindResumable(root, t, o.Level); s != nil && o.Plan == "" && !o.New {
 		progress(stepWorktree, "resuming "+s.ID)
 		if err := restore(s); err != nil {
 			return nil, err

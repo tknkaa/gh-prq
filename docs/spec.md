@@ -37,12 +37,14 @@ A TUI tool that turns a pull request diff into a fill-in-the-blank quiz that you
 gh prq                          # PR of the current branch
 gh prq 123                      # a specific PR
 gh prq --level hard --count 8   # difficulty and number of blanks
+gh prq 123 --new                # a fresh quiz instead of resuming
 gh prq 123 --plan plan.json     # blanks chosen by an AI agent
 gh prq --version
 ```
 
 - `--level`: `easy` (default) / `normal` / `hard`
 - `--count`: number of blanks, 5 by default
+- `--new`: start a new quiz even if an unfinished one exists. Blanks are chosen at random each time, but small PRs have few candidates, so the same blanks may come up again.
 - Flags may also follow the PR number.
 
 ## Target diff

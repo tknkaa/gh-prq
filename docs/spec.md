@@ -169,6 +169,7 @@ All text is in English. There is no GitHub-style diff view; the screen shows onl
 | `h` | next hint |
 | `a` | show answer |
 | `m` | mark as correct (only when answered and incorrect) |
+| `w` | copy the worktree path to the clipboard, to `cd` into it from another pane |
 | `y` | copy `absolute path:line` to the clipboard (wl-copy / xclip / pbcopy) |
 | `q` / Ctrl+C | quit |
 

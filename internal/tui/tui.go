@@ -135,6 +135,9 @@ func (m *Model) key(k string) tea.Cmd {
 		}
 	case "y":
 		m.flash = copyToClipboard(fmt.Sprintf("%s:%d", filepath.Join(m.s.Worktree, b.File), m.currentLine(b)))
+	case "w":
+		// 別ペインで `cd <貼り付け>` するのが一番手数が少ないので、パスだけをコピーする
+		m.flash = copyToClipboard(m.s.Worktree)
 	}
 	_ = m.s.Save()
 	return nil

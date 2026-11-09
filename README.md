@@ -26,7 +26,7 @@ Reading a diff is easy to skim. Rewriting the important parts yourself is not. `
 ╭─ Hints 1/4 ────────────────────────────────────────────────────────╮
 │ 1  It's an argument list.                                          │
 ╰────────────────────────────────────────────────────────────────────╯
- j/k move   h hint   a answer   m mark correct   y copy path   q quit
+ j/k move  h hint  a answer  m mark correct  w copy worktree  y copy path  q quit
 ```
 
 ## Install
@@ -49,10 +49,10 @@ gh prq --level hard --count 8   # harder blanks, and more of them
 
 If the current branch has no PR yet, `gh prq` quizzes you on its diff against the default branch.
 
-Then, in another terminal:
+Then press `w` to copy the worktree path, and in another terminal:
 
 ```sh
-cd <the worktree path shown by gh prq>
+cd <paste>
 nvim src/cart.ts   # or any editor
 ```
 
@@ -64,6 +64,7 @@ Search for `__prq_` or `prq#` to find the blanks, fill them in and save. The TUI
 | `h` | show the next hint |
 | `a` | show the answer |
 | `m` | mark your answer as correct (for valid alternatives) |
+| `w` | copy the worktree path |
 | `y` | copy `path:line` of the blank |
 | `q` | quit |
 

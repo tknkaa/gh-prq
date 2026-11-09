@@ -150,7 +150,7 @@ func (m *Model) headerView(w int) string {
 
 func (m *Model) footerView(w int) string {
 	keys := [][2]string{
-		{"j/k", "move"}, {"h", "hint"}, {"a", "answer"}, {"m", "mark correct"}, {"y", "copy path"}, {"q", "quit"},
+		{"j/k", "move"}, {"h", "hint"}, {"a", "answer"}, {"m", "mark correct"}, {"w", "copy worktree"}, {"y", "copy path"}, {"q", "quit"},
 	}
 	var parts []string
 	for _, k := range keys {

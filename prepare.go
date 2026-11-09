@@ -19,7 +19,6 @@ type options struct {
 	Level quiz.Level
 	Count int
 	Plan  string
-	New   bool
 }
 
 const (
@@ -49,26 +48,6 @@ func prepare(cwd string, o options, progress func(step int, detail string)) (*se
 		return nil, err
 	}
 
-	// --new は今の問題を捨てたいということなので、やりかけを消してから出題する。
-	// 残しておくと、使い道の無い記録が溜まるだけになる
-	if o.New {
-		for _, old := range session.Unfinished(root, t, o.Level) {
-			if _, err := os.Stat(old.Worktree); err == nil {
-				_ = gitx.RemoveWorktree(root, old.Worktree)
-			}
-			_ = old.Remove()
-		}
-	}
-	// AI の出題で始めるときは、やりかけのセッションより新しい出題を優先する
-	if s := session.FindResumable(root, t, o.Level); s != nil && o.Plan == "" {
-		progress(stepWorktree, "resuming "+s.ID)
-		if err := restore(s); err != nil {
-			return nil, err
-		}
-		progress(len(stepNames), "")
-		return s, nil
-	}
-
 	added, err := gitx.AddedRows(root, t.BaseSHA, t.HeadSHA)
 	if err != nil {
 		return nil, err
@@ -85,7 +64,7 @@ func prepare(cwd string, o options, progress func(step int, detail string)) (*se
 	}
 
 	s := &session.Session{
-		ID: session.NewID(), Repo: root, Target: t, Level: o.Level, CreatedAt: time.Now(),
+		ID: session.NewID(), Repo: root, Target: t, Level: o.Level, Orig: map[string][]byte{},
 	}
 	if plan != nil {
 		s.Level = "ai"
@@ -176,12 +155,7 @@ func prepare(cwd string, o options, progress func(step int, detail string)) (*se
 		if err := os.WriteFile(filepath.Join(s.Worktree, file), blanked, 0o644); err != nil {
 			return nil, err
 		}
-		if err := s.WriteFile("orig", file, origs[file]); err != nil {
-			return nil, err
-		}
-		if err := s.WriteFile("work", file, blanked); err != nil {
-			return nil, err
-		}
+		s.Orig[file] = origs[file]
 		s.Blanks = append(s.Blanks, blanks...)
 		i = j
 	}
@@ -227,38 +201,8 @@ func resolveTarget(cwd, root string, o options, progress func(int, string)) (ses
 	return t, nil
 }
 
-// restore は保存しておいた回答込みのファイルで worktree を作り直す。
-func restore(s *session.Session) error {
-	if _, err := os.Stat(s.Worktree); err != nil {
-		if err := gitx.AddWorktree(s.Repo, s.Worktree, s.Target.HeadSHA); err != nil {
-			return err
-		}
-	}
-	for _, f := range s.Files() {
-		data, err := s.ReadFile("work", f)
-		if err != nil {
-			return err
-		}
-		if err := os.WriteFile(filepath.Join(s.Worktree, f), data, 0o644); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// saveAnswers は worktree にある回答をセッションに退避する。
-func saveAnswers(s *session.Session) {
-	for _, f := range s.Files() {
-		if data, err := os.ReadFile(filepath.Join(s.Worktree, f)); err == nil {
-			_ = s.WriteFile("work", f, data)
-		}
-	}
-}
-
-// cleanup は回答を退避してから worktree を消す。次回はこの退避から再開する。
+// cleanup は worktree を消す。AI と使う場合に備えて、最後の結果を status に書いてから消す。
 func cleanup(s *session.Session) error {
-	saveAnswers(s)
-	s.Done = s.AllResolved()
 	if err := s.Save(); err != nil {
 		return err
 	}

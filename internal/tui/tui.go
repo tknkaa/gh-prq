@@ -82,11 +82,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ReadyMsg:
 		m.s, m.err = msg.Session, msg.Err
 		if m.s != nil {
-			for _, f := range m.s.Files() {
-				if data, err := m.s.ReadFile("orig", f); err == nil {
-					m.orig[f] = data
-				}
-			}
+			m.orig = m.s.Orig
 			m.poll()
 		}
 	case tickMsg:

@@ -68,9 +68,9 @@ Search for `__prq_` or `prq#` to find the blanks, fill them in and save. The TUI
 | `y` | copy `path:line` of the blank |
 | `q` | quit |
 
-Quitting saves your answers and removes the worktree. Run `gh prq` again on the same PR to continue where you left off, or `gh prq --new` to throw it away and get a fresh set of blanks.
+Quitting removes the worktree along with your answers. Every run is a new quiz, and nothing is stored outside the worktree.
 
-If prq was killed and left worktrees behind, `gh prq clean` removes every prq worktree in the repository. Your answers are kept, so you can still resume.
+If prq was killed and left worktrees behind, `gh prq clean` removes every prq worktree in the repository, along with any plan files an AI agent left behind.
 
 ### Levels
 
@@ -113,7 +113,22 @@ gh prq 123 --plan plan.json
 
 The agent's hint is shown first, and its explanation appears once a blank is solved or revealed. Results are written next to the plan as `plan.status.json` so the agent can review them with you.
 
-A [Claude Code](https://claude.com/claude-code) skill that does all of this is included in [`skills/prq`](skills/prq/SKILL.md). Copy or link it into `~/.claude/skills/prq` and ask Claude to quiz you on a PR.
+### Claude Code plugin
+
+A [Claude Code](https://claude.com/claude-code) plugin that does all of this is included. Install it from inside Claude Code:
+
+```
+/plugin install prq --marketplace tknkaa/gh-prq
+```
+
+On Claude Code older than 2.1.275, add the marketplace first:
+
+```
+/plugin marketplace add tknkaa/gh-prq
+/plugin install prq@gh-prq
+```
+
+Then ask Claude to quiz you on a PR, for example "quiz me on #123". The plugin opens the quiz in a new tab when Claude Code runs inside [herdr](https://herdr.dev); elsewhere it tells you the command to run.
 
 ## Building from source
 

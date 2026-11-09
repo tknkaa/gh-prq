@@ -194,3 +194,12 @@ func Worktrees(root string) ([]string, error) {
 	}
 	return paths, nil
 }
+
+// PlanDir は AI が plan を書く場所。作業ツリーに出ないよう、git ディレクトリの中に置く決まりにしている。
+func PlanDir(root string) (string, error) {
+	common, err := Git(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(common, "prq"), nil
+}

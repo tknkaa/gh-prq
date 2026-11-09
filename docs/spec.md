@@ -37,15 +37,14 @@ A TUI tool that turns a pull request diff into a fill-in-the-blank quiz that you
 gh prq                          # PR of the current branch
 gh prq 123                      # a specific PR
 gh prq --level hard --count 8   # difficulty and number of blanks
-gh prq 123 --new                # a fresh quiz instead of resuming
 gh prq 123 --plan plan.json     # blanks chosen by an AI agent
-gh prq clean                    # remove every prq worktree in this repository
+gh prq clean                    # remove leftover prq worktrees and AI plans in this repository
 gh prq --version
 ```
 
 - `--level`: `easy` (default) / `normal` / `hard`
 - `--count`: number of blanks, 5 by default
-- `--new`: start a new quiz even if an unfinished one exists. Unfinished sessions for the same PR, head commit and level are deleted, since nothing uses them once abandoned. Blanks are chosen at random each time, but small PRs have few candidates, so the same blanks may come up again.
+- Every run is a new quiz with blanks chosen at random. Small PRs have few candidates, so the same blanks may come up again.
 - Flags may also follow the PR number.
 
 ## Target diff
@@ -143,21 +142,10 @@ Each blank ends up in one of these states.
   - Always created under the main worktree, whichever worktree prq is run from.
   - Created detached, without a branch, so that cleanup never leaves branches behind.
   - `/.worktree/` is appended to `.git/info/exclude` if missing.
-- State: `$XDG_DATA_HOME/prq/sessions/<id>/` (default `~/.local/share/prq/sessions/<id>/`)
-  - `state.json`: everything, including blank positions, answers, anchors, hints and progress
-  - `status.json`: a summary for AI review
-  - `orig/<file>`: the file before blanking (used for grading)
-  - `work/<file>`: the file with the user's answers (used for resuming)
-- On quit (`q` / Ctrl+C):
-  1. Files with blanks are saved to `work/`.
-  2. The session is marked done if every blank is resolved.
-  3. The worktree is removed.
-  4. A summary is printed.
-- On the next run:
-  - If an unfinished session exists for the same repository, PR, head commit and level, the worktree is recreated, overwritten with the files in `work/`, and the quiz continues.
-  - If the head has changed, the diff has changed too, so a new quiz is created.
-  - Only files with blanks are saved, so edits to other files are lost.
-- `gh prq clean` removes every worktree under `.worktree/prq-*` in the repository. It is meant for worktrees left behind when prq is killed. Answers are saved to the session first, so the quiz can still be resumed. Running it while a quiz is open in another pane removes that quiz's worktree too.
+- Nothing is stored on disk outside the worktree. Blank positions, expected answers, the original files used for grading and progress live only in memory while prq runs. A quiz is meant to be solved in one sitting, so there is no resuming, and records would only pile up.
+  - The one exception is AI use: with `--plan`, results are written to `<plan>.status.json` for the review (see AI integration).
+- On quit (`q` / Ctrl+C), the worktree is removed and a summary is printed. Answers are discarded with it.
+- `gh prq clean` removes every worktree under `.worktree/prq-*` in the repository, and the AI plan directory `<git common dir>/prq/`. It is meant for what is left behind when prq or the AI agent is interrupted. Running it while a quiz is open in another pane removes that quiz's worktree too.
 - Quitting during preparation waits for preparation to finish and then cleans up, so no worktree is left behind. A failed preparation also removes its worktree.
 
 ## TUI
@@ -206,22 +194,22 @@ The AI never runs the quiz or grading logic. It communicates with prq through fi
 - `explanation`: shown as "Why" once the blank is resolved.
 - Each entry is checked against the actual file. Entries with an out-of-range line, a missing text, or a position too close to another blank are skipped, and the reason is shown in the TUI.
 - If the range matches a syntax node exactly, its kind is used in the hints; otherwise it is called a "piece of code".
-- With `--plan`, a new quiz is always created, even if an unfinished session exists.
 
 ### Status (prq → AI)
 
-- With `--plan foo.json`, results are also written to `foo.status.json`, so the AI can read them without knowing the session ID.
+- With `--plan foo.json`, results are also written to `foo.status.json`, so the AI can read them. This is the only file prq writes outside the worktree.
 - The file is written as soon as the quiz is ready, so the AI can wait for it to learn the worktree path.
 - Contents: worktree, target, level, whether it is done, warnings, and for each blank the outcome, answer, expected answer, attempts, hints used and explanation.
 
 ### Skill
 
-`skills/prq/SKILL.md`:
+`skills/prq/SKILL.md`, distributed as a Claude Code plugin. The repository root is both the plugin and its marketplace (`.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` with `"source": "./"`), so it installs with `/plugin install prq --marketplace tknkaa/gh-prq`. The plugin has no version, so every push to the default branch is an update.
 
 1. Understand the intent of the PR with `gh pr view` and `gh pr diff`.
 2. Choose 3–6 blanks at the heart of the change, confirm line numbers against the files at the head, and write the plan to `<git common dir>/prq/plan-<N>.json` (so it never appears in the working tree).
 3. Inside herdr, open a new tab running `gh prq <N> --plan <plan>`, and once the status file appears, open nvim in the worktree in a pane next to it. Outside herdr, only tell the user the command to run.
 4. When the user is done, read the status file and focus the review on blanks that were `revealed`, `incorrect`, or needed hints.
+5. Delete the plan and status files. If the agent is interrupted before this, `gh prq clean` removes them.
 
 ## Release
 

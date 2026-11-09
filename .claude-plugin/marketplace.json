@@ -1,0 +1,14 @@
+{
+  "name": "gh-prq",
+  "description": "Claude Code plugin for gh-prq",
+  "owner": {
+    "name": "tknkaa"
+  },
+  "plugins": [
+    {
+      "name": "prq",
+      "source": "./",
+      "description": "Quiz yourself on a pull request with gh-prq"
+    }
+  ]
+}

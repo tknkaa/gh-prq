@@ -124,3 +124,7 @@ gh extension install .
 ```
 
 See [docs/spec.md](docs/spec.md) for the full specification.
+
+## License
+
+[MIT](LICENSE)

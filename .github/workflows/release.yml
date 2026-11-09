@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  # tree-sitter が C で書かれていて cgo が要るため、クロスコンパイルせず各 OS のランナーでネイティブにビルドする
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # glibc は古い環境でも動くよう、あえて古めの Ubuntu でビルドする
+          - { runner: ubuntu-22.04, goos: linux, goarch: amd64 }
+          - { runner: ubuntu-22.04-arm, goos: linux, goarch: arm64 }
+          - { runner: macos-14, goos: darwin, goarch: arm64 }
+          # Intel Mac 用は Apple Silicon 上で clang に x86_64 を指定してビルドする
+          - { runner: macos-14, goos: darwin, goarch: amd64, cc: "clang -arch x86_64", nosmoke: true }
+          - { runner: windows-latest, goos: windows, goarch: amd64, ext: .exe }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        shell: bash
+        env:
+          CGO_ENABLED: "1"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CC: ${{ matrix.cc }}
+        run: |
+          if [ -z "$CC" ]; then unset CC; fi
+          mkdir -p dist
+          # gh はファイル名の末尾 (<os>-<arch>) で自分の環境向けのバイナリを選ぶので、この命名を崩さない
+          out="dist/gh-prq_${GITHUB_REF_NAME}_${GOOS}-${GOARCH}${{ matrix.ext }}"
+          go build -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" -o "$out" .
+      - name: Smoke test
+        if: ${{ !matrix.nosmoke }}
+        shell: bash
+        run: ./dist/gh-prq_*${{ matrix.ext }} --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gh-prq-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --generate-notes

@@ -17,9 +17,9 @@ jobs:
           # glibc は古い環境でも動くよう、あえて古めの Ubuntu でビルドする
           - { runner: ubuntu-22.04, goos: linux, goarch: amd64 }
           - { runner: ubuntu-22.04-arm, goos: linux, goarch: arm64 }
-          - { runner: macos-14, goos: darwin, goarch: arm64 }
+          - { runner: macos-latest, goos: darwin, goarch: arm64 }
           # Intel Mac 用は Apple Silicon 上で clang に x86_64 を指定してビルドする
-          - { runner: macos-14, goos: darwin, goarch: amd64, cc: "clang -arch x86_64", nosmoke: true }
+          - { runner: macos-latest, goos: darwin, goarch: amd64, cc: "clang -arch x86_64", nosmoke: true }
           - { runner: windows-latest, goos: windows, goarch: amd64, ext: .exe }
     runs-on: ${{ matrix.runner }}
     steps:

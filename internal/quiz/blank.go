@@ -26,6 +26,7 @@ type Blank struct {
 	AnchorNext  []string `json:"anchorNext"`
 	Line        int      `json:"line"`
 	Hints       []string `json:"hints"`
+	Explanation string   `json:"explanation,omitempty"`
 
 	Answer     string `json:"answer"`
 	Answered   bool   `json:"answered"`
@@ -89,6 +90,11 @@ func Build(file string, l *lang.Lang, orig []byte, cands []Candidate, firstID in
 			b.AnchorNext = append(b.AnchorNext, t.line(r))
 		}
 		b.Hints = makeHints(tree.RootNode(), orig, c)
+		// AI のヒントは意図に関するもので機械的なヒントより弱いので、先に出す
+		if c.Hint != "" {
+			b.Hints = append([]string{c.Hint}, b.Hints...)
+		}
+		b.Explanation = c.Explanation
 		blanks[i] = b
 	}
 	out := slices.Clone(orig)

@@ -283,6 +283,9 @@ func (m *Model) mainView() string {
 	out = append(out, " "+dim.Render(fmt.Sprintf("%s → %s · %s · %d / %d resolved",
 		s.Target.HeadRef, s.Target.BaseRef, s.Level, resolved, len(s.Blanks))))
 	out = append(out, " "+dim.Render("Worktree ")+s.Worktree)
+	for _, n := range s.Notes {
+		out = append(out, " "+sYellow.Render("! "+n))
+	}
 	out = append(out, " "+strings.Repeat("─", max(0, w-2)))
 
 	if s.AllResolved() {
@@ -358,6 +361,9 @@ func (m *Model) detailView(b *quiz.Blank, w int) []string {
 	}
 	if b.Revealed || b.Correct || b.Marked {
 		out = append(out, "", " "+dim.Render("Answer")+"  "+sGreen.Render(firstLines(b.Expected, 12)))
+		if b.Explanation != "" {
+			out = append(out, "", " "+dim.Render("Why")+"     "+strings.ReplaceAll(b.Explanation, "\n", "\n         "))
+		}
 	}
 	return out
 }

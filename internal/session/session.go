@@ -23,14 +23,18 @@ type Target struct {
 }
 
 type Session struct {
-	ID        string       `json:"id"`
-	Repo      string       `json:"repo"`
-	Worktree  string       `json:"worktree"`
-	Target    Target       `json:"target"`
-	Level     quiz.Level   `json:"level"`
-	CreatedAt time.Time    `json:"createdAt"`
-	Done      bool         `json:"done"`
-	Blanks    []quiz.Blank `json:"blanks"`
+	ID        string     `json:"id"`
+	Repo      string     `json:"repo"`
+	Worktree  string     `json:"worktree"`
+	Target    Target     `json:"target"`
+	Level     quiz.Level `json:"level"`
+	CreatedAt time.Time  `json:"createdAt"`
+	Done      bool       `json:"done"`
+	// Notes は出題時の警告 (AI の指定を採用できなかった理由など)
+	Notes []string `json:"notes,omitempty"`
+	// StatusPath を指定すると status.json をそこにも書く。AI がセッション ID を知らなくても結果を読めるように
+	StatusPath string       `json:"statusPath,omitempty"`
+	Blanks     []quiz.Blank `json:"blanks"`
 }
 
 // 状態を repo の外に置くのは、worktree を消しても回答や履歴が残るようにするため
@@ -78,19 +82,28 @@ func (s *Session) Save() error {
 	if err := writeJSON(filepath.Join(s.Dir(), "state.json"), s); err != nil {
 		return err
 	}
-	return writeJSON(filepath.Join(s.Dir(), "status.json"), s.status())
+	if err := writeJSON(filepath.Join(s.Dir(), "status.json"), s.status()); err != nil {
+		return err
+	}
+	if s.StatusPath != "" {
+		return writeJSON(s.StatusPath, s.status())
+	}
+	return nil
 }
 
 type blankStatus struct {
-	ID        int    `json:"id"`
-	File      string `json:"file"`
-	Line      int    `json:"line"`
-	Kind      string `json:"kind"`
-	Outcome   string `json:"outcome"`
-	Attempts  int    `json:"attempts"`
-	HintsUsed int    `json:"hintsUsed"`
-	Answer    string `json:"answer,omitempty"`
-	Expected  string `json:"expected"`
+	ID        int      `json:"id"`
+	File      string   `json:"file"`
+	Line      int      `json:"line"`
+	Kind      string   `json:"kind"`
+	Outcome   string   `json:"outcome"`
+	Attempts  int      `json:"attempts"`
+	HintsUsed int      `json:"hintsUsed"`
+	Answer    string   `json:"answer,omitempty"`
+	Expected  string   `json:"expected"`
+	Hints     []string `json:"hints,omitempty"`
+	// Explanation は AI が出題時に書いた解説。講評のときに AI 自身が参照する
+	Explanation string `json:"explanation,omitempty"`
 }
 
 // status は AI が講評に使う要約。state.json はアンカーなど内部用の情報が多いので分けている
@@ -101,11 +114,12 @@ func (s *Session) status() any {
 		bs = append(bs, blankStatus{
 			ID: b.ID, File: b.File, Line: b.Line, Kind: b.Kind, Outcome: b.Outcome(),
 			Attempts: b.Attempts, HintsUsed: b.HintsShown, Answer: b.Answer, Expected: b.Expected,
+			Hints: b.Hints[:min(b.HintsShown, len(b.Hints))], Explanation: b.Explanation,
 		})
 	}
 	return map[string]any{
 		"session": s.ID, "worktree": s.Worktree, "target": s.Target,
-		"level": s.Level, "done": s.Done, "blanks": bs,
+		"level": s.Level, "done": s.Done, "notes": s.Notes, "blanks": bs,
 	}
 }
 

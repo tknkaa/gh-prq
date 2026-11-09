@@ -36,6 +36,9 @@ type Candidate struct {
 	EndRow    int
 	Kind      string
 	LineLevel bool
+	// AI が出題したときだけ入る
+	Hint        string
+	Explanation string
 }
 
 // 小さすぎる識別子やリテラルは当て推量になるので、意味のまとまりがある式だけを穴にする
@@ -184,25 +187,23 @@ func Select(cands []Candidate, n int, rng *rand.Rand) []Candidate {
 	var picked []Candidate
 	for _, i := range rng.Perm(len(cands)) {
 		c := cands[i]
-		ok := true
-		for _, p := range picked {
-			if p.File == c.File && !(c.StartRow >= p.EndRow+3 || c.EndRow <= p.StartRow-3) {
-				ok = false
-				break
-			}
-		}
-		if ok {
+		if !conflicts(picked, c) {
 			picked = append(picked, c)
 			if len(picked) == n {
 				break
 			}
 		}
 	}
-	sort.Slice(picked, func(i, j int) bool {
-		if picked[i].File != picked[j].File {
-			return picked[i].File < picked[j].File
+	return SortCandidates(picked)
+}
+
+// SortCandidates はファイルごと・位置順に並べる。Build がこの順を前提にしているため。
+func SortCandidates(cs []Candidate) []Candidate {
+	sort.Slice(cs, func(i, j int) bool {
+		if cs[i].File != cs[j].File {
+			return cs[i].File < cs[j].File
 		}
-		return picked[i].Start < picked[j].Start
+		return cs[i].Start < cs[j].Start
 	})
-	return picked
+	return cs
 }

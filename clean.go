@@ -7,11 +7,10 @@ import (
 	"strings"
 
 	"github.com/tknkaa/gh-prq/internal/gitx"
-	"github.com/tknkaa/gh-prq/internal/session"
 )
 
 // runClean は今のリポジトリにある prq の worktree を全部消す。
-// 異常終了などで残った worktree を一掃するためのもので、回答は退避するので後から再開できる。
+// 通常は終了時に消えるが、異常終了すると残るので、それを一掃するためのもの。
 func runClean() error {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -26,17 +25,10 @@ func runClean() error {
 		return err
 	}
 	prefix := filepath.Join(root, ".worktree", "prq-")
-	byPath := map[string]*session.Session{}
-	for _, s := range session.All() {
-		byPath[s.Worktree] = s
-	}
 	removed := 0
 	for _, p := range paths {
 		if !strings.HasPrefix(p, prefix) {
 			continue
-		}
-		if s := byPath[p]; s != nil {
-			saveAnswers(s)
 		}
 		if err := gitx.RemoveWorktree(root, p); err != nil {
 			fmt.Fprintf(os.Stderr, "prq: failed to remove %s: %v\n", p, err)

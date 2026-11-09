@@ -27,10 +27,9 @@ func parseArgs(args []string) (options, error) {
 	level := fs.String("level", "easy", "difficulty: easy, normal, hard")
 	count := fs.Int("count", 5, "number of blanks")
 	plan := fs.String("plan", "", "use blanks chosen in a JSON plan file (written by an AI agent)")
-	fresh := fs.Bool("new", false, "start a new quiz instead of resuming an unfinished one")
 	showVersion := fs.Bool("version", false, "print version")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: gh prq [<number>] [--level easy|normal|hard] [--count N] [--new] [--plan FILE]\n       gh prq clean")
+		fmt.Fprintln(fs.Output(), "Usage: gh prq [<number>] [--level easy|normal|hard] [--count N] [--plan FILE]\n       gh prq clean")
 		fs.PrintDefaults()
 	}
 	var o options
@@ -56,7 +55,7 @@ func parseArgs(args []string) (options, error) {
 	if err != nil {
 		return o, err
 	}
-	o.Level, o.Count, o.Plan, o.New = lv, *count, *plan, *fresh
+	o.Level, o.Count, o.Plan = lv, *count, *plan
 	return o, nil
 }
 
@@ -109,7 +108,4 @@ func printSummary(s *session.Session) {
 		counts["solved"]+counts["solved_with_hints"], counts["solved_with_hints"],
 		counts["marked"], counts["revealed"],
 		len(s.Blanks)-counts["solved"]-counts["solved_with_hints"]-counts["marked"]-counts["revealed"])
-	if !s.Done {
-		fmt.Println("Your answers are saved. Run `gh prq` again to continue.")
-	}
 }

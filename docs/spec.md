@@ -68,6 +68,11 @@ Candidates are found with tree-sitter among the added lines.
 | hard | block | the body of `{ }` (the brace lines stay) or a Python indented block. 2–12 lines, all of them added |
 
 - Bare identifiers and literals are never blanks; they would be guesswork.
+- Terraform (HCL) uses its own rules, because what matters there is which value each argument gets:
+  - easy: the whole right-hand side of an argument (`name = <blank>`), such as a reference (`azurerm_resource_group.main.name`), a function call, a conditional or a string template. Parts of a reference are never blanked on their own. `true`, `false` and `null` are excluded because they are a coin toss.
+  - normal: a whole `name = value` line.
+  - hard: the body of a block (`resource`, `dynamic`, `content`, …), keeping the header and braces. The hint names the block type, such as "the body of a content block".
+  - The Terraform dialect of the grammar has no Go binding, so the plain HCL grammar is used. Terraform syntax is plain HCL, so nothing is lost.
 - Candidates are shuffled and picked so that at least 2 untouched lines separate blanks in the same file. Answers are located using the 2 lines before and after each blank as anchors, so anchors must not overlap other blanks.
 
 ### Representation in the file

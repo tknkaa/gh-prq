@@ -19,6 +19,7 @@ type options struct {
 	Level quiz.Level
 	Count int
 	Plan  string
+	New   bool
 }
 
 const (
@@ -48,6 +49,16 @@ func prepare(cwd string, o options, progress func(step int, detail string)) (*se
 		return nil, err
 	}
 
+	// --new は今の問題を捨てたいということなので、やりかけを消してから出題する。
+	// 残しておくと、使い道の無い記録が溜まるだけになる
+	if o.New {
+		for _, old := range session.Unfinished(root, t, o.Level) {
+			if _, err := os.Stat(old.Worktree); err == nil {
+				_ = gitx.RemoveWorktree(root, old.Worktree)
+			}
+			_ = old.Remove()
+		}
+	}
 	// AI の出題で始めるときは、やりかけのセッションより新しい出題を優先する
 	if s := session.FindResumable(root, t, o.Level); s != nil && o.Plan == "" {
 		progress(stepWorktree, "resuming "+s.ID)
@@ -235,13 +246,18 @@ func restore(s *session.Session) error {
 	return nil
 }
 
-// cleanup は回答を退避してから worktree を消す。次回はこの退避から再開する。
-func cleanup(s *session.Session) error {
+// saveAnswers は worktree にある回答をセッションに退避する。
+func saveAnswers(s *session.Session) {
 	for _, f := range s.Files() {
 		if data, err := os.ReadFile(filepath.Join(s.Worktree, f)); err == nil {
 			_ = s.WriteFile("work", f, data)
 		}
 	}
+}
+
+// cleanup は回答を退避してから worktree を消す。次回はこの退避から再開する。
+func cleanup(s *session.Session) error {
+	saveAnswers(s)
 	s.Done = s.AllResolved()
 	if err := s.Save(); err != nil {
 		return err

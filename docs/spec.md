@@ -37,12 +37,15 @@ A TUI tool that turns a pull request diff into a fill-in-the-blank quiz that you
 gh prq                          # PR of the current branch
 gh prq 123                      # a specific PR
 gh prq --level hard --count 8   # difficulty and number of blanks
+gh prq 123 --new                # a fresh quiz instead of resuming
 gh prq 123 --plan plan.json     # blanks chosen by an AI agent
+gh prq clean                    # remove every prq worktree in this repository
 gh prq --version
 ```
 
 - `--level`: `easy` (default) / `normal` / `hard`
 - `--count`: number of blanks, 5 by default
+- `--new`: start a new quiz even if an unfinished one exists. Unfinished sessions for the same PR, head commit and level are deleted, since nothing uses them once abandoned. Blanks are chosen at random each time, but small PRs have few candidates, so the same blanks may come up again.
 - Flags may also follow the PR number.
 
 ## Target diff
@@ -154,6 +157,7 @@ Each blank ends up in one of these states.
   - If an unfinished session exists for the same repository, PR, head commit and level, the worktree is recreated, overwritten with the files in `work/`, and the quiz continues.
   - If the head has changed, the diff has changed too, so a new quiz is created.
   - Only files with blanks are saved, so edits to other files are lost.
+- `gh prq clean` removes every worktree under `.worktree/prq-*` in the repository. It is meant for worktrees left behind when prq is killed. Answers are saved to the session first, so the quiz can still be resumed. Running it while a quiz is open in another pane removes that quiz's worktree too.
 - Quitting during preparation waits for preparation to finish and then cleans up, so no worktree is left behind. A failed preparation also removes its worktree.
 
 ## TUI

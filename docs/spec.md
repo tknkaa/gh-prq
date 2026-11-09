@@ -1,28 +1,28 @@
-# gh-prq 仕様
+# gh-prq specification
 
-（2026-11-09 時点）
+(As of 2026-11-09)
 
-PR の差分を穴埋めクイズにして、手元のエディタでコードを書いて解く TUI ツール。主な用途は自分の PR の復習で、他人の PR を理解するのにも使う。
+A TUI tool that turns a pull request diff into a fill-in-the-blank quiz that you solve by writing code in your own editor. The main use case is reviewing your own PRs; it also helps you understand other people's PRs.
 
-## 方針
+## Principles
 
-- 回答は手元のエディタで書く。穴を空けたファイルは実際の worktree に置くので、LSP（補完、定義ジャンプ、型エラー）が普段どおり効く。
-- TUI は閲覧と採点だけを担当する。エディタとは連携せず、ファイルの変更だけを見る。そのため、エディタの種類を問わない。
-- AI なしでも動く。穴の選択もヒントも機械的に作る。AI は出題と講評の質を上げる追加機能という位置付け。
-- 依存は最小限にする。外部ライブラリは Bubble Tea / Lip Gloss（TUI）と go-tree-sitter・各言語の grammar（構文解析）だけにする。git と gh はサブプロセスで呼ぶ。
+- Answers are written in your own editor. The blanked files live in a real git worktree, so your LSP (completion, go-to-definition, type errors) works as usual.
+- The TUI only displays and grades. It does not integrate with any editor; it only watches files, so any editor works.
+- It works without AI. Both blank selection and hints are generated mechanically. AI is an optional layer that improves the questions and the review.
+- Keep dependencies minimal. The only external libraries are Bubble Tea / Lip Gloss (TUI) and go-tree-sitter with the language grammars (parsing). git and gh are invoked as subprocesses.
 
-## 技術構成
+## Technology
 
-- Go で書き、gh extension（`tknkaa/gh-prq`、コマンドは `gh prq`）として配布する。
-  - gh extension はリポジトリ名が `gh-` で始まる必要がある。
-  - 実行ファイルは gh に依存せずに単体でも動く（`./gh-prq`）。
-- tree-sitter は C で書かれているので cgo が必要になる。
-  - 開発環境では gcc があれば意識しなくていい。
-  - 配布用のバイナリは CI で OS ごとにビルドする（後述）。
-- 対応言語: TypeScript / TSX / JavaScript / Go / Python / Rust。
-  - grammar はバイナリに組み込むので、言語を増やすとバイナリが大きくなる。
+- Written in Go and distributed as a gh extension (`tknkaa/gh-prq`, command `gh prq`).
+  - gh requires extension repositories to be named `gh-*`.
+  - The binary does not depend on gh to start and also runs standalone (`./gh-prq`).
+- tree-sitter is written in C, so cgo is required.
+  - In development you only need gcc.
+  - Release binaries are built natively per OS in CI (see Release).
+- Supported languages: TypeScript / TSX / JavaScript / Go / Python / Rust.
+  - Grammars are compiled into the binary, so each new language makes it larger.
 
-| 依存 | バージョン |
+| Dependency | Version |
 |---|---|
 | go-tree-sitter | v0.25.0 |
 | tree-sitter-typescript | v0.23.2 |
@@ -31,154 +31,154 @@ PR の差分を穴埋めクイズにして、手元のエディタでコード�
 | bubbletea | v1.3.10 |
 | lipgloss | v1.1.0 |
 
-## コマンド
+## Commands
 
 ```sh
-gh prq                          # 今のブランチの PR
-gh prq 123                      # PR 番号を指定
-gh prq --level hard --count 8   # 難易度と穴の数
-gh prq 123 --plan plan.json     # AI が選んだ穴で出題
+gh prq                          # PR of the current branch
+gh prq 123                      # a specific PR
+gh prq --level hard --count 8   # difficulty and number of blanks
+gh prq 123 --plan plan.json     # blanks chosen by an AI agent
 gh prq --version
 ```
 
-- `--level`: `easy`（デフォルト）/ `normal` / `hard`
-- `--count`: 穴の数。デフォルトは 5
-- PR 番号の後ろにもフラグを書ける。
+- `--level`: `easy` (default) / `normal` / `hard`
+- `--count`: number of blanks, 5 by default
+- Flags may also follow the PR number.
 
-## 対象の差分
+## Target diff
 
-- PR の場合
-  - `gh pr view --json` でタイトル、head のコミット、base ブランチを取る。
-  - `git fetch origin <base>` と `git fetch origin pull/<N>/head` でコミットを取得する。フォークからの PR でも取れるように、ブランチ名ではなく `pull/N/head` を使う。
-  - 差分は `merge-base(origin/<base>, head)..head`。
-- 今のブランチに PR が無い場合は、デフォルトブランチ（`origin/HEAD`、無ければ `main` か `master`）との差分にフォールバックする。PR を作る前でも復習できるようにするため。
-- 差分の取得には GitHub API ではなく git を使う。API の diff は大きな PR で切り詰められることがあり、worktree の中身とずれる恐れがあるため。
-- ref 範囲の指定（`main..feat/x` など）は対応しない。
+- For a PR:
+  - `gh pr view --json` provides the title, head commit and base branch.
+  - Commits are fetched with `git fetch origin <base>` and `git fetch origin pull/<N>/head`. `pull/N/head` is used instead of the branch name so that PRs from forks work.
+  - The diff is `merge-base(origin/<base>, head)..head`.
+- If the current branch has no PR, prq falls back to the diff against the default branch (`origin/HEAD`, otherwise `main` or `master`), so you can review a branch before opening a PR.
+- The diff comes from git, not the GitHub API. The API truncates diffs of large PRs and could disagree with the worktree contents.
+- Arbitrary ref ranges (`main..feat/x`) are not supported.
 
-## 穴
+## Blanks
 
-### 候補の選び方
+### Selection
 
-追加された行の中から tree-sitter で候補を探す。
+Candidates are found with tree-sitter among the added lines.
 
-| 難易度 | 単位 | 条件 |
+| Level | Unit | Conditions |
 |---|---|---|
-| easy | 式 | 関数呼び出し、引数リスト、二項演算、アロー関数、メンバー参照、条件の括弧など。1 行に収まり、3〜80 文字で、行全体ではないもの |
-| normal | 1 行 | 行の中身が 1 つの構文要素とぴったり一致する行。`foo(` のように途中で切れる行は、答えが一意に決まらないので除く |
-| hard | ブロック | `{ }` の中身（括弧の行は残す）か、Python のインデントブロック。2〜12 行で、全行が追加行のもの |
+| easy | expression | calls, argument lists, binary expressions, arrow functions, member access, parenthesized conditions, and so on. Fits on one line, 3–80 characters, and is not the whole line |
+| normal | one line | the line's content matches exactly one syntax node. Lines cut mid-construct such as `foo(` are excluded because their answer is ambiguous |
+| hard | block | the body of `{ }` (the brace lines stay) or a Python indented block. 2–12 lines, all of them added |
 
-- 識別子やリテラル単体は、当て推量になるので穴にしない。
-- 候補をシャッフルし、同じファイルの穴どうしの間に 2 行以上の手付かずの行が残るように選ぶ。回答の位置を前後 2 行をアンカーにして探すので、アンカーが他の穴と重ならないようにするため。
+- Bare identifiers and literals are never blanks; they would be guesswork.
+- Candidates are shuffled and picked so that at least 2 untouched lines separate blanks in the same file. Answers are located using the 2 lines before and after each blank as anchors, so anchors must not overlap other blanks.
 
-### ファイル上の表現
+### Representation in the file
 
-- 式の穴: `__prq_1__` に置き換える。構文として成立したままなので、周りの補完や型推論が生きる。
-- 行・ブロックの穴: インデントを保った `// prq#2: fill in`（Python は `#`）の 1 行に置き換える。番号の後ろの `:` は、`#1` が `#10` に前方一致しないようにするため。
-- 正解はファイルに残さず、worktree の外のセッションに保存する。
+- Expression blanks become `__prq_1__`. The code stays syntactically valid, so completion and type inference around it keep working.
+- Line and block blanks become a single indented `// prq#2: fill in` line (`#` for Python). The `:` after the number prevents `#1` from matching `#10` as a prefix.
+- The expected answer is never left in the file; it is stored in the session outside the worktree.
 
-## 回答の取り出し
+## Extracting answers
 
-- 行番号はユーザーの編集でずれるので、穴の前後 2 行をアンカーにして回答の範囲を探す。
-  - 前のアンカーは、元の位置に一番近い一致を使う。
-  - 後ろのアンカーは、前のアンカーより後ろで最初の一致を使う。
-- 式の穴は、範囲の先頭と末尾から元の行の前後の部分を取り除いたものを回答とする。
-- 行・ブロックの穴は、プレースホルダーのコメントが残っていればそれを除いて、残りを回答とする。消し忘れても、その下に書いた内容を採点するため。
-- アンカーが見つからない場合（周りの行を書き換えた場合など）は「Can't find the blank」とする。
+- Line numbers shift as the user edits, so the answer region is found using the 2 lines before and after the blank as anchors.
+  - For the leading anchor, the match closest to the original position wins.
+  - For the trailing anchor, the first match after the leading anchor wins.
+- For expression blanks, the answer is the region minus the original text before and after the blank on that line.
+- For line and block blanks, the region is the answer. A leftover placeholder comment is dropped, so content written below it is still graded.
+- If the anchors cannot be found (for example, the surrounding lines were edited), the blank is reported as "Can't find the blank".
 
-## 採点
+## Grading
 
-- 回答を元のファイルの該当範囲に埋め戻し、元のファイルと構文木の葉の並びを比べる。
-  - 空白・改行・コメントの違いは無視する。
-  - 閉じ括弧の直前のカンマ（末尾カンマ）は無視する。
-- 別解（`a + b` と `b + a` など）は自動では判定しない。代わりに「Mark as correct」で自己申告できる。
-- テストやビルドを実行して採点する機能は持たない。
+- The answer is spliced back into the original file, and the sequence of syntax tree leaves is compared with the original.
+  - Whitespace, newlines and comments are ignored.
+  - A trailing comma before a closing bracket is ignored.
+- Alternative correct answers (`a + b` vs `b + a`) are not detected automatically; the user can "Mark as correct" instead.
+- prq does not run tests or builds to grade.
 
-### タイミング
+### Timing
 
-- 穴のあるファイルの更新時刻とサイズを 0.1 秒ごとに見て、変わったら即採点する。保存を検知できればいいので、エディタは何でもいい。
-- ファイル監視ライブラリ（fsnotify）は使わずにポーリングにした。体感の差が無く、依存を増やさないため。
-- 回答が前回と同じなら採点し直さない。試行回数は回答が変わるたびに増える。
+- The modification time and size of each file with blanks are polled every 0.1 s, and the file is graded as soon as it changes. Any editor works as long as it saves the file.
+- Polling is used instead of a file watcher library (fsnotify): there is no noticeable difference, and it avoids a dependency.
+- An unchanged answer is not regraded. The attempt count increases every time the answer changes.
 
-## ヒント
+## Hints
 
-AI なしで、押すたびに 1 段ずつ多く見せる。
+Generated without AI. Each press reveals one more level.
 
-| 段階 | 内容 | 例（正解が `(a, i) => a + i.price` のとき） |
+| Level | Content | Example (answer `(a, i) => a + i.price`) |
 |---|---|---|
-| 1 | ノードの種類 | `It's an arrow function.` |
-| 2 | 骨格（識別子・リテラル・文字列を `_` に伏せる） | `(_, _) => _ + _._` |
-| 3 | 使っている識別子 | `Uses: a, i, price` |
-| 4 | 先頭の数文字 | `Starts with: (a, i) …` |
+| 1 | node kind | `It's an arrow function.` |
+| 2 | shape, with identifiers, literals and strings replaced by `_` | `(_, _) => _ + _._` |
+| 3 | identifiers used | `Uses: a, i, price` |
+| 4 | first few characters | `Starts with: (a, i) …` |
 
-AI が出題した場合は、AI のヒントを 1 段目に加える（全 5 段）。
+When an AI agent writes the plan, its hint is added as the first level (5 levels in total).
 
-## 結果の記録
+## Outcomes
 
-穴ごとの結果は次のいずれか。
+Each blank ends up in one of these states.
 
-| outcome | 意味 |
+| outcome | Meaning |
 |---|---|
-| `solved` | ヒントなしで正解 |
-| `solved_with_hints` | ヒントを使って正解 |
-| `marked` | 不正解判定だが Mark as correct で正解にした |
-| `revealed` | 正解する前に答えを見た |
-| `incorrect` | 回答したが不正解 |
-| `unanswered` | 未回答 |
-| `missing` | 回答の位置を見失った |
+| `solved` | correct without hints |
+| `solved_with_hints` | correct after using hints |
+| `marked` | graded incorrect, but the user marked it as correct |
+| `revealed` | the answer was shown before solving |
+| `incorrect` | answered but wrong |
+| `unanswered` | not answered yet |
+| `missing` | the answer could not be located |
 
-- 正解は Show answer を押すまで見せない。
-- 自力で正解した後に答えを見ても `revealed` にはしない。
+- The expected answer stays hidden until "Show answer".
+- Showing the answer after solving does not turn a blank into `revealed`.
 
-## セッション
+## Sessions
 
-- worktree: `<main のワークツリーのルート>/.worktree/prq-<id>`
-  - どの worktree から実行しても、main のルートの下に作る。
-  - ブランチを作らずに detach で作る。片付けたときにブランチが残らないようにするため。
-  - `.git/info/exclude` に `/.worktree/` を追記する（無ければ）。
-- 状態: `$XDG_DATA_HOME/prq/sessions/<id>/`（既定は `~/.local/share/prq/sessions/<id>/`）
-  - `state.json`: 穴の位置、正解、アンカー、ヒント、進捗など全部
-  - `status.json`: AI が講評に使う要約
-  - `orig/<file>`: 穴を空ける前のファイル（採点用）
-  - `work/<file>`: 回答込みのファイル（再開用）
-- 終了（`q` / Ctrl+C）
-  1. 穴のあるファイルを `work/` に退避する
-  2. 全問が解決済みなら、セッションを完了にする
-  3. worktree を削除する
-  4. 結果の要約を表示する
-- 次回の起動
-  - 同じリポジトリ・同じ PR・同じ head のコミットで、完了していないセッションがあれば、worktree を作り直して `work/` のファイルで上書きし、続きから再開する。
-  - head が変わっていれば差分も変わっているので、新しく出題する。
-  - 退避するのは穴のあるファイルだけなので、他のファイルへの編集は消える。
-- 準備中に `q` で抜けても、準備の完了を待ってから片付けるので worktree は残らない。準備の途中で失敗した場合も削除する。
+- Worktree: `<root of the main worktree>/.worktree/prq-<id>`
+  - Always created under the main worktree, whichever worktree prq is run from.
+  - Created detached, without a branch, so that cleanup never leaves branches behind.
+  - `/.worktree/` is appended to `.git/info/exclude` if missing.
+- State: `$XDG_DATA_HOME/prq/sessions/<id>/` (default `~/.local/share/prq/sessions/<id>/`)
+  - `state.json`: everything, including blank positions, answers, anchors, hints and progress
+  - `status.json`: a summary for AI review
+  - `orig/<file>`: the file before blanking (used for grading)
+  - `work/<file>`: the file with the user's answers (used for resuming)
+- On quit (`q` / Ctrl+C):
+  1. Files with blanks are saved to `work/`.
+  2. The session is marked done if every blank is resolved.
+  3. The worktree is removed.
+  4. A summary is printed.
+- On the next run:
+  - If an unfinished session exists for the same repository, PR and head commit, the worktree is recreated, overwritten with the files in `work/`, and the quiz continues.
+  - If the head has changed, the diff has changed too, so a new quiz is created.
+  - Only files with blanks are saved, so edits to other files are lost.
+- Quitting during preparation waits for preparation to finish and then cleans up, so no worktree is left behind. A failed preparation also removes its worktree.
 
 ## TUI
 
-表示はすべて英語。GitHub 風の差分ビューは作らず、必要最小限にする。
+All text is in English. There is no GitHub-style diff view; the screen shows only what is needed.
 
-- 準備中: 段階ごとの進み具合（Resolving pull request → Fetching commits → Creating worktree → Parsing changed files → Choosing blanks）。失敗した段に ✗ と理由を出す。
-- メイン画面
-  - ヘッダー: PR のタイトルと番号、`head → base`、難易度、解決数、worktree の絶対パス
-  - AI の指定を採用できなかった場合の警告
-  - 穴の一覧（ファイルごと）: 状態の記号、番号、`file:line`、状態
-  - 選択中の穴: 該当行の前後 3 行（回答部分を強調）、自分の回答（不正解のとき）、表示済みのヒント、答えと AI の解説（解決後）
-- 操作
+- While preparing: progress per step (Resolving pull request → Fetching commits → Creating worktree → Parsing changed files → Choosing blanks). A failed step shows ✗ and the reason.
+- Main screen:
+  - Header: PR title and number, `head → base`, level, number resolved, absolute worktree path
+  - Warnings when parts of an AI plan could not be used
+  - Blanks grouped by file: status mark, number, `file:line`, status
+  - Selected blank: 3 lines of context around it (answer highlighted), your answer (when incorrect), hints shown so far, and the answer with the AI explanation (once resolved)
+- Keys:
 
-| キー | 動作 |
+| Key | Action |
 |---|---|
-| `j` / `k` | 穴の移動 |
-| `h` | 次のヒント |
-| `a` | 答えを見る |
-| `m` | Mark as correct（回答済みで不正解のときだけ） |
-| `y` | `絶対パス:行` をクリップボードにコピー（wl-copy / xclip / pbcopy） |
-| `q` / Ctrl+C | 終了 |
+| `j` / `k` | move between blanks |
+| `h` | next hint |
+| `a` | show answer |
+| `m` | mark as correct (only when answered and incorrect) |
+| `y` | copy `absolute path:line` to the clipboard (wl-copy / xclip / pbcopy) |
+| `q` / Ctrl+C | quit |
 
-- 配色は GitHub（Primer）に合わせ、ライト/ダークに追従する。
+- Colors follow GitHub's Primer palette and adapt to light and dark terminals.
 
-## AI 連携
+## AI integration
 
-AI に出題・採点のロジックを実行させず、ファイルでやり取りする。
+The AI never runs the quiz or grading logic. It communicates with prq through files.
 
-### plan（AI → prq）
+### Plan (AI → prq)
 
 ```json
 {
@@ -190,49 +190,48 @@ AI に出題・採点のロジックを実行させず、ファイルでやり�
 }
 ```
 
-- `line` / `endLine`: head 側のファイルの 1 始まりの行番号
-- `text`: その行の中の文字列。指定するとその部分だけを穴にし、省略すると `line`〜`endLine` の行全体を穴にする
-- `hint`: ヒントの 1 段目。答えを明かさない、意図についての問いにする
-- `explanation`: 解決後に「Why」として表示する解説
-- 実際のファイルと突き合わせて検証し、行が範囲外、文字列が見つからない、他の穴に近すぎる、などの指定はスキップして TUI に理由を表示する。
-- 範囲が構文要素とぴったり一致すればその種類をヒントに使い、一致しなければ「piece of code」とする。
-- `--plan` を指定したときは、やりかけのセッションがあっても新しく出題する。
+- `line` / `endLine`: 1-based line numbers in the file at the PR head
+- `text`: a substring of that line. When given, only that substring becomes the blank; otherwise lines `line`..`endLine` become the blank.
+- `hint`: the first hint. It should be a question about intent that does not give the answer away.
+- `explanation`: shown as "Why" once the blank is resolved.
+- Each entry is checked against the actual file. Entries with an out-of-range line, a missing text, or a position too close to another blank are skipped, and the reason is shown in the TUI.
+- If the range matches a syntax node exactly, its kind is used in the hints; otherwise it is called a "piece of code".
+- With `--plan`, a new quiz is always created, even if an unfinished session exists.
 
-### status（prq → AI）
+### Status (prq → AI)
 
-- `--plan foo.json` のとき、`foo.status.json` にも結果を書き出す。AI がセッション ID を知らなくても読めるようにするため。
-- 出題の準備ができた時点で書き出すので、AI はこのファイルの出現を待てば worktree のパスが分かる。
-- 内容: worktree、対象、難易度、完了したか、警告、穴ごとの outcome・回答・正解・試行回数・使ったヒント・解説
+- With `--plan foo.json`, results are also written to `foo.status.json`, so the AI can read them without knowing the session ID.
+- The file is written as soon as the quiz is ready, so the AI can wait for it to learn the worktree path.
+- Contents: worktree, target, level, whether it is done, warnings, and for each blank the outcome, answer, expected answer, attempts, hints used and explanation.
 
-### skill
+### Skill
 
-`skills/prq/SKILL.md`。
+`skills/prq/SKILL.md`:
 
-1. `gh pr view` と `gh pr diff` で PR の意図を把握する
-2. 意図の核心にあたる 3〜6 個の穴を選び、head のファイルで行番号を確かめてから plan を書く。plan は `<git common dir>/prq/plan-<N>.json` に置く（作業ツリーに出ないように）
-3. herdr の中なら、新しいタブで `gh prq <N> --plan <plan>` を起動し、status ファイルが出たら隣のペインで worktree の nvim を開く。herdr の外なら、起動コマンドを案内するだけ
-4. 終わったと言われたら status を読み、`revealed`・`incorrect`・ヒントを使った穴を中心に講評する
+1. Understand the intent of the PR with `gh pr view` and `gh pr diff`.
+2. Choose 3–6 blanks at the heart of the change, confirm line numbers against the files at the head, and write the plan to `<git common dir>/prq/plan-<N>.json` (so it never appears in the working tree).
+3. Inside herdr, open a new tab running `gh prq <N> --plan <plan>`, and once the status file appears, open nvim in the worktree in a pane next to it. Outside herdr, only tell the user the command to run.
+4. When the user is done, read the status file and focus the review on blanks that were `revealed`, `incorrect`, or needed hints.
 
-## リリース
+## Release
 
-- `v*` のタグを push すると、GitHub Actions が各 OS のランナーで cgo ビルドして Release を作る。
-- ファイル名は `gh-prq_<tag>_<os>-<arch>[.exe]`。gh はこの末尾で自分の環境向けのバイナリを選ぶ。
+- Pushing a `v*` tag makes GitHub Actions build binaries natively on each OS with cgo and publish a release.
+- Files are named `gh-prq_<tag>_<os>-<arch>[.exe]`; gh picks the binary for the user's platform by this suffix.
 
-| OS / arch | ランナー | 備考 |
+| OS / arch | Runner | Notes |
 |---|---|---|
-| linux-amd64 | ubuntu-22.04 | glibc の互換性のため古めの Ubuntu |
+| linux-amd64 | ubuntu-22.04 | an older Ubuntu for glibc compatibility |
 | linux-arm64 | ubuntu-22.04-arm | |
-| darwin-arm64 | macos-14 | |
-| darwin-amd64 | macos-14 | `clang -arch x86_64` でビルド。実行テストはしない |
+| darwin-arm64 | macos-latest | |
+| darwin-amd64 | macos-latest | built with `clang -arch x86_64`; not smoke-tested |
 | windows-amd64 | windows-latest | |
 
-- ビルドしたバイナリは各ランナーで `--version` を実行して確かめる（darwin-amd64 以外）。
-- push と PR では gofmt、vet、test を実行する。
+- Each binary is smoke-tested with `--version` on its runner (except darwin-amd64).
+- gofmt, vet and tests run on every push and pull request.
 
-## 未確認・今後
+## Unverified and future work
 
-- 本物の PR を使った経路（`gh pr view`、`pull/N/head` の fetch）は未確認。
-- リリースの CI は未実行。特に Windows ランナーで cgo 用の gcc が使えるか。
-- skill の herdr 操作は未確認。herdr 以外のマルチプレクサ（tmux など）は要望があれば対応する。
-- `gh extension install .` でのインストールは未確認。
-- README が無い。
+- The real PR path (`gh pr view`, fetching `pull/N/head`) has not been tried yet.
+- The macOS release builds have not succeeded yet (the Linux and Windows builds have).
+- The herdr steps of the skill have not been tried. Other multiplexers (such as tmux) will be supported on request.
+- Installing with `gh extension install .` has not been tried.

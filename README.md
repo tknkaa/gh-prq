@@ -5,28 +5,28 @@ Turn a pull request diff into a fill-in-the-blank quiz, and solve it by writing 
 Reading a diff is easy to skim. Rewriting the important parts yourself is not. `gh prq` checks out the PR into a temporary worktree, blanks out parts of the code it added, and grades your answers every time you save, with your editor and LSP working as usual.
 
 ```
- Add tax to cart total #123
- feat/cart-total → origin/main · easy · 1 / 3 resolved
- Worktree /home/you/src/shop/.worktree/prq-3f9a1c2e
- ──────────────────────────────────────────────────────────
- src/cart.ts
-   ✓ #1  cart.ts:6     Solved
-   ✗ #2  cart.ts:11    Incorrect
-   · #3  cart.ts:15    Not answered
- ──────────────────────────────────────────────────────────
- #2  src/cart.ts:11  Incorrect · 1 attempt
-
-     8    const sum = active.reduce((a, i) => a + i.price, 0);
-     9
-    10    if (sum > LIMIT) {
-    11 +    console.warn("wrong");
-    12      throw new Error("limit exceeded");
-
- Yours  ("wrong")
-
- Hint 1  It's an argument list.
-
- j/k move · h hint · a show answer · m mark as correct · y copy path · q quit
+ Add tax to cart total #123                             1/3 resolved
+ feat/cart-total → origin/main · easy · ~/src/shop/.worktree/prq-3f9a
+╭─ Blanks ───────────────────────────────────────────────────────────╮
+│ src/cart.ts                                                        │
+│   ✓ #1  :6     Solved                                              │
+│ ▶ ✗ #2  :11    Incorrect                                           │
+│   · #3  :15    Open                                                │
+╰────────────────────────────────────────────────────────────────────╯
+╭─ #2  src/cart.ts:11 ──────────────────────────────────── Incorrect ─╮
+│     8    const sum = active.reduce((a, i) => a + i.price, 0);       │
+│     9                                                               │
+│    10    if (sum > LIMIT) {                                         │
+│    11 +    console.warn("wrong");                                   │
+│    12      throw new Error("limit exceeded");                       │
+╰─────────────────────────────────────────────────────────────────────╯
+╭─ Your answer · 1 attempt ───────────────────────────────────────────╮
+│ ("wrong")                                                           │
+╰─────────────────────────────────────────────────────────────────────╯
+╭─ Hints 1/4 ─────────────────────────────────────────────────────────╮
+│ 1  It's an argument list.                                           │
+╰─────────────────────────────────────────────────────────────────────╯
+ j/k move   h hint   a answer   m mark correct   y copy path   q quit
 ```
 
 ## Install

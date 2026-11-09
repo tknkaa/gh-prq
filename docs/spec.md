@@ -153,7 +153,7 @@ Each blank ends up in one of these states.
 
 ## TUI
 
-All text is in English. There is no GitHub-style diff view; the screen shows only what is needed.
+All text is in English. There is no GitHub-style diff view; the screen shows only what is needed. On terminals at least 90 columns wide, the blank list sits on the left and the details on the right; narrower terminals stack them. Long lines wrap instead of being cut off: code wraps at the column, prose at word boundaries.
 
 - While preparing: progress per step (Resolving pull request → Fetching commits → Creating worktree → Parsing changed files → Choosing blanks). A failed step shows ✗ and the reason.
 - Main screen:

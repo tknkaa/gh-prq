@@ -179,3 +179,18 @@ func ensureExcluded(root string) error {
 	_, err = f.WriteString(prefix + "/.worktree/\n")
 	return err
 }
+
+// Worktrees は登録されている worktree のパスを返す。
+func Worktrees(root string) ([]string, error) {
+	out, err := Git(root, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, l := range strings.Split(out, "\n") {
+		if p, ok := strings.CutPrefix(l, "worktree "); ok {
+			paths = append(paths, p)
+		}
+	}
+	return paths, nil
+}

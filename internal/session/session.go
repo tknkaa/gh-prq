@@ -153,14 +153,13 @@ func (s *Session) ReadFile(kind, file string) ([]byte, error) {
 	return os.ReadFile(filepath.Join(s.Dir(), kind, file))
 }
 
-// FindResumable は同じ PR の同じコミットに対する、やりかけのセッションを探す。
-// head が進んでいたら差分が変わっているので、古いセッションは再開しない。
-func FindResumable(repo string, t Target, level quiz.Level) *Session {
+// All は保存されている全セッションを返す。壊れたものは読み飛ばす。
+func All() []*Session {
 	entries, err := os.ReadDir(filepath.Join(baseDir(), "sessions"))
 	if err != nil {
 		return nil
 	}
-	var found *Session
+	var out []*Session
 	for _, e := range entries {
 		data, err := os.ReadFile(filepath.Join(baseDir(), "sessions", e.Name(), "state.json"))
 		if err != nil {
@@ -170,13 +169,37 @@ func FindResumable(repo string, t Target, level quiz.Level) *Session {
 		if json.Unmarshal(data, &s) != nil {
 			continue
 		}
-		// 難易度を変えて起動したのは別の問題を解きたいということなので、やりかけでも再開しない
+		out = append(out, &s)
+	}
+	return out
+}
+
+// Unfinished は同じ PR の同じコミット・同じ難易度の、やりかけのセッションを返す。
+// head が進んでいたら差分が変わっているので対象にしない。
+// 難易度を変えて起動したのは別の問題を解きたいということなので、難易度が違うものも対象にしない。
+func Unfinished(repo string, t Target, level quiz.Level) []*Session {
+	var out []*Session
+	for _, s := range All() {
 		if s.Done || s.Repo != repo || s.Level != level || s.Target.HeadSHA != t.HeadSHA || s.Target.PR != t.PR || s.Target.HeadRef != t.HeadRef {
 			continue
 		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// FindResumable はやりかけのセッションのうち一番新しいものを返す。
+func FindResumable(repo string, t Target, level quiz.Level) *Session {
+	var found *Session
+	for _, s := range Unfinished(repo, t, level) {
 		if found == nil || s.CreatedAt.After(found.CreatedAt) {
-			found = &s
+			found = s
 		}
 	}
 	return found
+}
+
+// Remove はセッションの記録を消す。worktree は消さないので、呼び出し側で先に片付ける。
+func (s *Session) Remove() error {
+	return os.RemoveAll(s.Dir())
 }

@@ -70,6 +70,8 @@ Search for `__prq_` or `prq#` to find the blanks, fill them in and save. The TUI
 
 Quitting saves your answers and removes the worktree. Run `gh prq` again on the same PR to continue where you left off, or `gh prq --new` to throw it away and get a fresh set of blanks.
 
+If prq was killed and left worktrees behind, `gh prq clean` removes every prq worktree in the repository. Your answers are kept, so you can still resume.
+
 ### Levels
 
 | Level | Blanks |

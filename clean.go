@@ -9,8 +9,8 @@ import (
 	"github.com/tknkaa/gh-prq/internal/gitx"
 )
 
-// runClean は今のリポジトリにある prq の worktree を全部消す。
-// 通常は終了時に消えるが、異常終了すると残るので、それを一掃するためのもの。
+// runClean は今のリポジトリにある prq の worktree と、AI 用の plan を全部消す。
+// 通常はどちらも終了時に消えるが、異常終了すると残るので、それを一掃するためのもの。
 func runClean() error {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -37,8 +37,19 @@ func runClean() error {
 		fmt.Println("removed", p)
 		removed++
 	}
+	// AI が書いた plan と status は講評の後に消す決まりだが、途中で落ちると残るので、ここでも消す
+	planDir, err := gitx.PlanDir(root)
+	if err == nil {
+		if _, err := os.Stat(planDir); err == nil {
+			if err := os.RemoveAll(planDir); err != nil {
+				return err
+			}
+			fmt.Println("removed", planDir)
+			removed++
+		}
+	}
 	if removed == 0 {
-		fmt.Println("No prq worktrees in this repository.")
+		fmt.Println("Nothing to clean in this repository.")
 	}
 	return nil
 }

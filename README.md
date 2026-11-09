@@ -70,7 +70,7 @@ Search for `__prq_` or `prq#` to find the blanks, fill them in and save. The TUI
 
 Quitting removes the worktree along with your answers. Every run is a new quiz, and nothing is stored outside the worktree.
 
-If prq was killed and left worktrees behind, `gh prq clean` removes every prq worktree in the repository.
+If prq was killed and left worktrees behind, `gh prq clean` removes every prq worktree in the repository, along with any plan files an AI agent left behind.
 
 ### Levels
 
@@ -113,23 +113,22 @@ gh prq 123 --plan plan.json
 
 The agent's hint is shown first, and its explanation appears once a blank is solved or revealed. Results are written next to the plan as `plan.status.json` so the agent can review them with you.
 
-### Claude Code skill
+### Claude Code plugin
 
-A [Claude Code](https://claude.com/claude-code) skill that does all of this is included in [`skills/prq`](skills/prq/SKILL.md). Install it into your personal skills directory:
+A [Claude Code](https://claude.com/claude-code) plugin that does all of this is included. Install it from inside Claude Code:
 
-```sh
-mkdir -p ~/.claude/skills/prq
-curl -fsSL https://raw.githubusercontent.com/tknkaa/gh-prq/main/skills/prq/SKILL.md \
-  -o ~/.claude/skills/prq/SKILL.md
+```
+/plugin install prq --marketplace tknkaa/gh-prq
 ```
 
-If you have a clone of this repository, link it instead so it stays up to date with `git pull`:
+On Claude Code older than 2.1.275, add the marketplace first:
 
-```sh
-ln -s "$PWD/skills/prq" ~/.claude/skills/prq
+```
+/plugin marketplace add tknkaa/gh-prq
+/plugin install prq@gh-prq
 ```
 
-Then ask Claude to quiz you on a PR, for example "quiz me on #123". The skill opens the quiz in a new tab when Claude Code runs inside [herdr](https://herdr.dev); elsewhere it tells you the command to run.
+Then ask Claude to quiz you on a PR, for example "quiz me on #123". The plugin opens the quiz in a new tab when Claude Code runs inside [herdr](https://herdr.dev); elsewhere it tells you the command to run.
 
 ## Building from source
 

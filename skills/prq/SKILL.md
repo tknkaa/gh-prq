@@ -92,3 +92,14 @@ When the user says they are done, read the status file. For each blank it has `o
 Do not walk through every blank. Focus on the ones that were revealed, incorrect, or needed hints:
 explain what the user's answer would have done and why the PR needs the expected code. Briefly
 acknowledge the ones solved without help.
+
+## 5. Clean up
+
+After the review, delete the plan and its status file so they do not pile up in the git directory:
+
+```sh
+rm -f "$plan" "${plan%.json}.status.json"
+```
+
+If a previous run was interrupted, `gh prq clean` removes leftover worktrees and everything under
+`<git common dir>/prq/`.

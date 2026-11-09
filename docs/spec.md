@@ -38,7 +38,7 @@ gh prq                          # PR of the current branch
 gh prq 123                      # a specific PR
 gh prq --level hard --count 8   # difficulty and number of blanks
 gh prq 123 --plan plan.json     # blanks chosen by an AI agent
-gh prq clean                    # remove every prq worktree in this repository
+gh prq clean                    # remove leftover prq worktrees and AI plans in this repository
 gh prq --version
 ```
 
@@ -145,7 +145,7 @@ Each blank ends up in one of these states.
 - Nothing is stored on disk outside the worktree. Blank positions, expected answers, the original files used for grading and progress live only in memory while prq runs. A quiz is meant to be solved in one sitting, so there is no resuming, and records would only pile up.
   - The one exception is AI use: with `--plan`, results are written to `<plan>.status.json` for the review (see AI integration).
 - On quit (`q` / Ctrl+C), the worktree is removed and a summary is printed. Answers are discarded with it.
-- `gh prq clean` removes every worktree under `.worktree/prq-*` in the repository. It is meant for worktrees left behind when prq is killed. Running it while a quiz is open in another pane removes that quiz's worktree too.
+- `gh prq clean` removes every worktree under `.worktree/prq-*` in the repository, and the AI plan directory `<git common dir>/prq/`. It is meant for what is left behind when prq or the AI agent is interrupted. Running it while a quiz is open in another pane removes that quiz's worktree too.
 - Quitting during preparation waits for preparation to finish and then cleans up, so no worktree is left behind. A failed preparation also removes its worktree.
 
 ## TUI
@@ -203,12 +203,13 @@ The AI never runs the quiz or grading logic. It communicates with prq through fi
 
 ### Skill
 
-`skills/prq/SKILL.md`:
+`skills/prq/SKILL.md`, distributed as a Claude Code plugin. The repository root is both the plugin and its marketplace (`.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` with `"source": "./"`), so it installs with `/plugin install prq --marketplace tknkaa/gh-prq`. The plugin has no version, so every push to the default branch is an update.
 
 1. Understand the intent of the PR with `gh pr view` and `gh pr diff`.
 2. Choose 3–6 blanks at the heart of the change, confirm line numbers against the files at the head, and write the plan to `<git common dir>/prq/plan-<N>.json` (so it never appears in the working tree).
 3. Inside herdr, open a new tab running `gh prq <N> --plan <plan>`, and once the status file appears, open nvim in the worktree in a pane next to it. Outside herdr, only tell the user the command to run.
 4. When the user is done, read the status file and focus the review on blanks that were `revealed`, `incorrect`, or needed hints.
+5. Delete the plan and status files. If the agent is interrupted before this, `gh prq clean` removes them.
 
 ## Release
 

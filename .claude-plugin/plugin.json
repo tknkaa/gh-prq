@@ -1,0 +1,9 @@
+{
+  "name": "prq",
+  "description": "Quiz yourself on a pull request with gh-prq: Claude picks the blanks that capture the PR's intent, opens the quiz, and reviews your answers.",
+  "author": {
+    "name": "tknkaa"
+  },
+  "homepage": "https://github.com/tknkaa/gh-prq",
+  "license": "MIT"
+}

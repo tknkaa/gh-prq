@@ -7,6 +7,7 @@ import (
 	"unsafe"
 
 	hcl "github.com/tree-sitter-grammars/tree-sitter-hcl/bindings/go"
+	tsyaml "github.com/tree-sitter-grammars/tree-sitter-yaml/bindings/go"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 	tsgo "github.com/tree-sitter/tree-sitter-go/bindings/go"
 	tsjs "github.com/tree-sitter/tree-sitter-javascript/bindings/go"
@@ -55,10 +56,20 @@ var (
 			"literal_value": "literal value", "template_expr": "string template",
 			"collection_value": "list or map", "for_expr": "for expression",
 		}}
+	yaml = &Lang{Name: "YAML", Comment: "#", ptr: tsyaml.Language,
+		KindNames: map[string]string{
+			"plain_scalar": "value", "double_quote_scalar": "quoted string",
+			"single_quote_scalar": "quoted string", "flow_sequence": "list",
+			"flow_mapping": "map", "block_mapping_pair": "key: value pair",
+			"block_sequence_item": "list item",
+		}}
 )
 
 // IsHCL は HCL 固有の候補の選び方を使うかどうかを返す。
 func (l *Lang) IsHCL() bool { return l == terraform }
+
+// IsYAML は YAML 固有の候補の選び方を使うかどうかを返す。
+func (l *Lang) IsYAML() bool { return l == yaml }
 
 // IsIndentBlock はインデントでブロックを作る言語かどうかを返す。
 func (l *Lang) IsIndentBlock() bool { return l == python }
@@ -79,6 +90,7 @@ var byExt = map[string]*Lang{
 	".py": python,
 	".rs": rust,
 	".tf": terraform, ".tfvars": terraform, ".hcl": terraform,
+	".yaml": yaml, ".yml": yaml,
 }
 
 // ForFile は対応していない拡張子なら nil を返す。

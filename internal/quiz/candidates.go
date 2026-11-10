@@ -98,6 +98,11 @@ func easyCandidates(file string, l *lang.Lang, root *sitter.Node, src []byte, t 
 			if kind, ok = hclEasyKind(n, src); !ok {
 				return
 			}
+		} else if l.IsYAML() {
+			var ok bool
+			if kind, ok = yamlEasyKind(n, src); !ok {
+				return
+			}
 		} else if !easyKinds[kind] {
 			return
 		}
@@ -142,6 +147,37 @@ func hclEasyKind(n *sitter.Node, src []byte) (string, bool) {
 		if c.Kind() == "variable_expr" && n.NamedChildCount() > 1 {
 			return "variable_expr", true
 		}
+		return c.Kind(), true
+	}
+	return n.Kind(), true
+}
+
+// YAML も Terraform と同じく「このキーに何を書くか」が問うべき点なので、キーの値を丸ごと穴にする。
+// スカラーの一部だけを空けると、文字列の途中を当てる問題になって意味が薄い。
+func yamlEasyKind(n *sitter.Node, src []byte) (string, bool) {
+	if n.Kind() != "flow_node" {
+		return "", false
+	}
+	p := n.Parent()
+	if p == nil {
+		return "", false
+	}
+	switch p.Kind() {
+	case "block_mapping_pair", "flow_pair":
+		// キーの側を穴にしても、何のキーかを当てる問題にしかならない
+		if v := p.ChildByFieldName("value"); v == nil || v.Id() != n.Id() {
+			return "", false
+		}
+	case "block_sequence_item":
+	default:
+		return "", false
+	}
+	// true / false / null は二択の当て推量になるので出さない
+	switch strings.ToLower(strings.TrimSpace(n.Utf8Text(src))) {
+	case "true", "false", "null", "yes", "no", "on", "off", "~":
+		return "", false
+	}
+	if c := n.NamedChild(0); c != nil {
 		return c.Kind(), true
 	}
 	return n.Kind(), true
@@ -200,6 +236,24 @@ func blockCandidates(file string, l *lang.Lang, root *sitter.Node, src []byte, t
 			kind = "block"
 			if id := p.NamedChild(0); id != nil && id.Kind() == "identifier" {
 				kind = id.Utf8Text(src) + " block"
+			}
+		case l.IsYAML():
+			// キーの行は残して、その下にぶら下がる値のブロックだけを穴にする。キーまで消すと何を書くべきか分からない
+			p := n.Parent()
+			if k != "block_node" || p == nil || p.Kind() != "block_mapping_pair" {
+				return
+			}
+			if strings.TrimSpace(t.line(sr)[:n.StartPosition().Column]) != "" {
+				return
+			}
+			is, ie = sr, er
+			// 末尾のブロックは次の行の先頭で終わることがあるので、その空の行は含めない。含めると最後の行が追加行でないとみなされる
+			if n.EndPosition().Column == 0 {
+				ie--
+			}
+			kind = "block"
+			if key := p.ChildByFieldName("key"); key != nil {
+				kind = "value of " + key.Utf8Text(src)
 			}
 		case k != "statement_block" && k != "block":
 			return

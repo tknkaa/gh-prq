@@ -19,7 +19,7 @@ A TUI tool that turns a pull request diff into a fill-in-the-blank quiz that you
 - tree-sitter is written in C, so cgo is required.
   - In development you only need gcc.
   - Release binaries are built natively per OS in CI (see Release).
-- Supported languages: TypeScript / TSX / JavaScript / Go / Python / Rust / Terraform (HCL).
+- Supported languages: TypeScript / TSX / JavaScript / Go / Python / Rust / Terraform (HCL) / YAML.
   - Grammars are compiled into the binary, so each new language makes it larger.
 
 | Dependency | Version |
@@ -75,6 +75,10 @@ Candidates are found with tree-sitter among the added lines.
   - normal: a whole `name = value` line.
   - hard: the body of a block (`resource`, `dynamic`, `content`, …), keeping the header and braces. The hint names the block type, such as "the body of a content block".
   - The Terraform dialect of the grammar has no Go binding, so the plain HCL grammar is used. Terraform syntax is plain HCL, so nothing is lost.
+- YAML follows the same idea, since what matters is which value each key gets:
+  - easy: the whole value of a key or a list item on one line, such as `runs-on: <blank>` or `branches: <blank>` for `[main]`. Keys are never blanked. `true`, `false`, `null`, `yes`, `no`, `on`, `off` and `~` are excluded.
+  - normal: a whole `key: value` line or list item.
+  - hard: the nested value under a key (2–12 lines), keeping the key line. The hint names the key, such as "value of steps".
 - Candidates are shuffled and picked so that at least 2 untouched lines separate blanks in the same file. Answers are located using the 2 lines before and after each blank as anchors, so anchors must not overlap other blanks.
 
 ### Representation in the file

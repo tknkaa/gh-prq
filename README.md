@@ -86,7 +86,7 @@ Answers are compared by their syntax trees, so whitespace, line breaks, comments
 
 ### Supported languages
 
-TypeScript, TSX, JavaScript, Go, Python, Rust and Terraform (HCL).
+TypeScript, TSX, JavaScript, Go, Python, Rust, Terraform (HCL) and YAML.
 
 ## Using it with an AI agent
 
